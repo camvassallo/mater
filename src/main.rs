@@ -277,9 +277,9 @@ async fn get_data() -> Result<Vec<PlayerStats>, Box<dyn Error>> {
                 i + 1,
                 player.player_name,
                 player.team,
-                player.pts,
-                player.treb,
-                player.ast
+                player.pts.unwrap(),
+                player.treb.unwrap(),
+                player.ast.unwrap(),
             );
         }
         if players.len() > 5 {
@@ -312,5 +312,5 @@ async fn main() -> Result<(), Box<dyn Error>> {
     players.clear();
 
     let scylla_db: Session = scylla(players).await?;
-    query_specific_player(scylla_db, "Providence", "Bryce Hopkins").await
+    query_specific_player(scylla_db, "Duke", "Cooper Flagg").await
 }
