@@ -1,0 +1,6 @@
+# .cargo/config.toml
+
+[env]
+# Set environment variables for cargo commands run within this project
+RUST_LOG = "info"
+# OTHER_VAR = "value"
