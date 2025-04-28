@@ -9,3 +9,6 @@ csv = "1.3.1"
 serde = { version = "1.0.219", features = ["derive"] }
 log = "0.4"
 env_logger = "0.11" # Check crates.io for the latest version
+scylla = "0.13" # Check for the latest version
+tokio = { version = "1", features = ["full"] } # Async runtime
+anyhow = "1.0" # For simpler error handling in the example

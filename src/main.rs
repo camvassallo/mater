@@ -6,14 +6,15 @@ use std::error::Error;
 use log::{error, warn, info, debug, trace, LevelFilter};
 // Import the `env_logger` initializer
 use env_logger;
+use scylla::{IntoTypedRows, Session, SessionBuilder};
 
 // Define a struct that matches the columns you expect in the CSV.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct PlayerStats {
     player_name: String,
     team: String,
     conf: String,
-    gp: Option<u32>,
+    gp: Option<i32>,
     min_per: Option<f64>,
     o_rtg: Option<f64>,
     usg: Option<f64>,
@@ -23,14 +24,14 @@ struct PlayerStats {
     drb_per: Option<f64>,
     ast_per: Option<f64>,
     to_per: Option<f64>,
-    ftm: Option<u32>,
-    fta: Option<u32>,
+    ftm: Option<i32>,
+    fta: Option<i32>,
     ft_per: Option<f64>,
-    two_pm: Option<u32>,
-    two_pa: Option<u32>,
+    two_pm: Option<i32>,
+    two_pa: Option<i32>,
     two_p_per: Option<f64>,
-    tpm: Option<u32>,
-    tpa: Option<u32>,
+    tpm: Option<i32>,
+    tpa: Option<i32>,
     tp_per: Option<f64>,
     blk_per: Option<f64>,
     stl_per: Option<f64>,
@@ -41,8 +42,8 @@ struct PlayerStats {
     porpag: Option<f64>,
     adjoe: Option<f64>,
     pfr: Option<f64>,
-    year: Option<u32>,
-    pid: Option<u32>,
+    year: Option<i32>,
+    pid: Option<i32>,
     player_type: Option<String>, // Renamed from 'type' to avoid keyword clash
     rec_rank: Option<f64>,
     ast_tov: Option<f64>,
@@ -76,11 +77,129 @@ struct PlayerStats {
     pts: Option<f64>,
 }
 
+const KEYSPACE: &str = "player_analytics";
+const TABLE: &str = "player_stats";
+const NODE_ADDRESS: &str = "127.0.0.1:9042";
 
-fn main() -> Result<(), Box<dyn Error>> {
 
-    env_logger::init();
-    
+async fn scylla(players:Vec<PlayerStats>) -> Result<Session, Box<dyn Error>> {
+
+    info!("Connecting to ScyllaDB at {}...", NODE_ADDRESS);
+
+    // 1. Establish Connection
+    let session: Session = SessionBuilder::new()
+        .known_node(NODE_ADDRESS)
+        .build()
+        .await?;
+
+    info!("Connection successful!");
+
+    // 2. Create Keyspace (if it doesn't exist)
+    let create_keyspace_cql = format!(
+        "CREATE KEYSPACE IF NOT EXISTS {} WITH REPLICATION = {{'class': 'SimpleStrategy', 'replication_factor': 1}}",
+        KEYSPACE
+    );
+    session.query(create_keyspace_cql, &[]).await?;
+    info!("Keyspace '{}' ensured.", KEYSPACE);
+
+    // Use the keyspace for subsequent operations
+    session.use_keyspace(KEYSPACE, true).await?;
+
+    // 3. Create Table (if it doesn't exist)
+    //    IMPORTANT: Choose a primary key suitable for your data model.
+    //    Here, we use (team, player_name) assuming a player on a specific team is unique.
+    //    `team` is the partition key (determines data distribution).
+    //    `player_name` is the clustering key (determines order within a partition).
+    let create_table_cql = format!(
+        "CREATE TABLE IF NOT EXISTS {} (
+            player_name TEXT,
+            team TEXT,
+            conf TEXT,
+            gp INT,         // Scylla INT can store i32 fine
+            min_per DOUBLE, // Scylla DOUBLE maps well to f64
+            o_rtg DOUBLE,
+            usg DOUBLE,
+            PRIMARY KEY ((team), player_name) // Composite Primary Key: Partition by team, cluster by player_name
+        )",
+        TABLE
+    );
+    session.query(create_table_cql, &[]).await?;
+    info!("Table '{}.{}' ensured.", KEYSPACE, TABLE);
+
+    // TODO: get the data here
+    // DONE - passed in as arg
+
+    // 5. Prepare the INSERT statement for efficiency
+    let insert_cql = format!(
+        "INSERT INTO {} (player_name, team, conf, gp, min_per, o_rtg, usg) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        TABLE
+    );
+    let prepared_insert = session.prepare(insert_cql).await?;
+    info!("Prepared INSERT statement.");
+
+    // 6. Iterate and Insert Data
+    info!("Inserting player data...");
+    for player in players {
+        info!("Inserting stats for: {}", player.player_name);
+        // The driver handles Option<T> correctly, mapping None to NULL.
+        // The order of values in the tuple MUST match the order of '?' in the CQL.
+        session
+            .execute(
+                &prepared_insert,
+                (
+                    &player.player_name, // Use references where possible
+                    &player.team,
+                    &player.conf,
+                    player.gp,        // Pass Option<i32> directly
+                    player.min_per,   // Pass Option<f64> directly
+                    player.o_rtg,
+                    player.usg,
+                ),
+            )
+            .await?;
+    }
+
+    info!("Data insertion complete!");
+    Ok(session)
+}
+
+async fn query_specific_player(session: Session, team_name: &str, player_name_filter: &str) -> Result<(), Box<dyn Error>> {
+    info!("\nQuerying for player '{}' on team '{}'...", player_name_filter, team_name);
+
+    // 1. Define CQL with placeholders for team and player_name
+    let select_cql = format!(
+        "SELECT player_name, team, gp FROM {} WHERE team = ? AND player_name = ? LIMIT 1", // Added WHERE clause and LIMIT 1
+        TABLE
+    );
+
+    // 2. Execute the query, passing values in a tuple
+    //    The order in the tuple MUST match the order of '?' in the CQL
+    if let Some(rows) = session
+        .query(select_cql, (team_name, player_name_filter)) // Pass values here
+        .await?
+        .rows
+    {
+        if rows.is_empty() {
+            warn!("No player found matching Name='{}' and Team='{}'", player_name_filter, team_name);
+        } else {
+            // Expecting only one row due to primary key uniqueness or LIMIT 1
+            for row in rows.into_typed::<(String, String, Option<i32>)>() { // Types match SELECT clause
+                match row {
+                    Ok((name, team, gp)) => {
+                        info!("Retrieved: Name={}, Team={}, GP={:?}", name, team, gp)
+                    }
+                    Err(e) => error!("Error parsing row: {}", e),
+                }
+            }
+        }
+    } else {
+        info!("Query returned no rows structure for Name='{}' and Team='{}'", player_name_filter, team_name);
+    }
+
+    Ok(())
+}
+
+async fn get_data() -> Result<Vec<PlayerStats>, Box<dyn Error>> {
     // The URL - using 2024 data as 2025 might not be available yet
     // Using csv=0 as csv=1 might add headers we don't want here
     let url = "https://barttorvik.com/getadvstats.php?year=2025&csv=1";
@@ -88,7 +207,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     info!("Fetching data from: {}", url);
 
     // Fetch the CSV data as text using the blocking client
-    let csv_data = reqwest::blocking::get(url)?.text()?;
+    let csv_data = reqwest::get(url).await?.text().await?;
 
     info!("Data fetched successfully. Parsing CSV...");
 
@@ -169,13 +288,29 @@ fn main() -> Result<(), Box<dyn Error>> {
     } else {
         info!("\nNo players were collected.");
     }
-    
-    for player in players {
+
+    // TODO: learn why we use &players here
+    // the error was "Value used after being moved"
+    for player in &players {
         if player.player_name == "Cooper Flagg" {
             info!("{}", player.adjoe.unwrap());
         }
     }
 
+    Ok(players)
+}
 
-    Ok(())
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+
+    env_logger::init();
+
+    let mut players: Vec<PlayerStats> = get_data().await?;
+
+    info!("Players collected: {}", players.len());
+
+    players.clear();
+
+    let scylla_db: Session = scylla(players).await?;
+    query_specific_player(scylla_db, "Providence", "Bryce Hopkins").await
 }
