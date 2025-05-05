@@ -1,0 +1,28 @@
+[Unit]
+Description=Rust API Backend Service
+After=network.target
+
+[Service]
+# Path to your compiled Rust binary
+ExecStart=/usr/local/bin/myapp
+
+# Optional: set environment variables here or load from a file
+Environment=RUST_LOG=info
+# EnvironmentFile=-/etc/myapp.env   # Uncomment to load from file
+
+# Run as root or a specific user
+User=root
+
+# Auto-restart on crash
+Restart=on-failure
+RestartSec=3
+
+# Output logs to journal (view with journalctl)
+StandardOutput=journal
+StandardError=journal
+
+# Set working directory if needed
+WorkingDirectory=/usr/local/bin
+
+[Install]
+WantedBy=multi-user.target

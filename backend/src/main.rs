@@ -1,15 +1,17 @@
 use reqwest; // Use the blocking client
 use csv::{ReaderBuilder, StringRecord, Reader}; // Import Reader explicitly
-use serde::Deserialize; // Use serde for deserialization
+use serde::{Deserialize, Serialize}; // Use serde for deserialization
 use std::error::Error;
 // Import the logging macros from the `log` crate
 use log::{error, warn, info, debug, trace, LevelFilter};
 // Import the `env_logger` initializer
 use env_logger;
-use scylla::{IntoTypedRows, Session, SessionBuilder};
+use scylla::{FromRow, IntoTypedRows, Session, SessionBuilder};
+use actix_web::{get, web, App, HttpServer, HttpResponse, Responder};
+
 
 // Define a struct that matches the columns you expect in the CSV.
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, FromRow, Serialize)]
 struct PlayerStats {
     player_name: String,
     team: String,
@@ -18,63 +20,68 @@ struct PlayerStats {
     min_per: Option<f64>,
     o_rtg: Option<f64>,
     usg: Option<f64>,
-    e_fg: Option<f64>,
-    ts_per: Option<f64>,
-    orb_per: Option<f64>,
-    drb_per: Option<f64>,
-    ast_per: Option<f64>,
-    to_per: Option<f64>,
-    ftm: Option<i32>,
-    fta: Option<i32>,
-    ft_per: Option<f64>,
-    two_pm: Option<i32>,
-    two_pa: Option<i32>,
-    two_p_per: Option<f64>,
-    tpm: Option<i32>,
-    tpa: Option<i32>,
-    tp_per: Option<f64>,
-    blk_per: Option<f64>,
-    stl_per: Option<f64>,
-    ftr: Option<f64>,
-    yr: Option<String>,
-    ht: Option<String>,
-    num: Option<String>,
-    porpag: Option<f64>,
-    adjoe: Option<f64>,
-    pfr: Option<f64>,
-    year: Option<i32>,
-    pid: Option<i32>,
-    player_type: Option<String>, // Renamed from 'type' to avoid keyword clash
-    rec_rank: Option<f64>,
-    ast_tov: Option<f64>,
-    rim_made: Option<f64>,
-    rim_attempted: Option<f64>,
-    mid_made: Option<f64>,
-    mid_attempted: Option<f64>,
-    rim_pct: Option<f64>,
-    mid_pct: Option<f64>,
-    dunks_made: Option<f64>,
-    dunks_attempted: Option<f64>,
-    dunk_pct: Option<f64>,
-    pick: Option<f64>,
-    drtg: Option<f64>,
-    adrtg: Option<f64>,
-    dporpag: Option<f64>,
-    stops: Option<f64>,
-    bpm: Option<f64>,
-    obpm: Option<f64>,
-    dbpm: Option<f64>,
-    gbpm: Option<f64>,
-    mp: Option<f64>,
-    ogbpm: Option<f64>,
-    dgbpm: Option<f64>,
-    oreb: Option<f64>,
-    dreb: Option<f64>,
-    treb: Option<f64>,
-    ast: Option<f64>,
-    stl: Option<f64>,
-    blk: Option<f64>,
-    pts: Option<f64>,
+    // e_fg: Option<f64>,
+    // ts_per: Option<f64>,
+    // orb_per: Option<f64>,
+    // drb_per: Option<f64>,
+    // ast_per: Option<f64>,
+    // to_per: Option<f64>,
+    // ftm: Option<i32>,
+    // fta: Option<i32>,
+    // ft_per: Option<f64>,
+    // two_pm: Option<i32>,
+    // two_pa: Option<i32>,
+    // two_p_per: Option<f64>,
+    // tpm: Option<i32>,
+    // tpa: Option<i32>,
+    // tp_per: Option<f64>,
+    // blk_per: Option<f64>,
+    // stl_per: Option<f64>,
+    // ftr: Option<f64>,
+    // yr: Option<String>,
+    // ht: Option<String>,
+    // num: Option<String>,
+    // porpag: Option<f64>,
+    // adjoe: Option<f64>,
+    // pfr: Option<f64>,
+    // year: Option<i32>,
+    // pid: Option<i32>,
+    // player_type: Option<String>, // Renamed from 'type' to avoid keyword clash
+    // rec_rank: Option<f64>,
+    // ast_tov: Option<f64>,
+    // rim_made: Option<f64>,
+    // rim_attempted: Option<f64>,
+    // mid_made: Option<f64>,
+    // mid_attempted: Option<f64>,
+    // rim_pct: Option<f64>,
+    // mid_pct: Option<f64>,
+    // dunks_made: Option<f64>,
+    // dunks_attempted: Option<f64>,
+    // dunk_pct: Option<f64>,
+    // pick: Option<f64>,
+    // drtg: Option<f64>,
+    // adrtg: Option<f64>,
+    // dporpag: Option<f64>,
+    // stops: Option<f64>,
+    // bpm: Option<f64>,
+    // obpm: Option<f64>,
+    // dbpm: Option<f64>,
+    // gbpm: Option<f64>,
+    // mp: Option<f64>,
+    // ogbpm: Option<f64>,
+    // dgbpm: Option<f64>,
+    // oreb: Option<f64>,
+    // dreb: Option<f64>,
+    // treb: Option<f64>,
+    // ast: Option<f64>,
+    // stl: Option<f64>,
+    // blk: Option<f64>,
+    // pts: Option<f64>,
+}
+
+struct PlayerStats2 {
+    player_name: String,
+    usg: Option<f64>,
 }
 
 const KEYSPACE: &str = "player_analytics";
@@ -82,17 +89,20 @@ const TABLE: &str = "player_stats";
 const NODE_ADDRESS: &str = "127.0.0.1:9042";
 
 
-async fn scylla(players:Vec<PlayerStats>) -> Result<Session, Box<dyn Error>> {
+async fn connect_to_scylla() -> Session {
 
     info!("Connecting to ScyllaDB at {}...", NODE_ADDRESS);
 
-    // 1. Establish Connection
-    let session: Session = SessionBuilder::new()
-        .known_node(NODE_ADDRESS)
+    SessionBuilder::new()
+        .known_node(NODE_ADDRESS) // adjust if running in Docker
         .build()
-        .await?;
+        .await
+        .expect("Failed to connect to ScyllaDB")
+}
 
-    info!("Connection successful!");
+async fn scylla(players:Vec<PlayerStats>) -> Result<Session, Box<dyn Error>> {
+
+    let session = connect_to_scylla().await;
 
     // 2. Create Keyspace (if it doesn't exist)
     let create_keyspace_cql = format!(
@@ -271,17 +281,17 @@ async fn get_data() -> Result<Vec<PlayerStats>, Box<dyn Error>> {
     // Optional: Print details of the first few collected players
     if !players.is_empty() {
         info!("\nFirst few players collected:");
-        for (i, player) in players.iter().enumerate().take(5) { // Iterate over the collected players
-            info!(
-                "{}. Player: {}, Team: {}, Pts: {:.1?}, Reb: {:.1?}, Ast: {:.1?}",
-                i + 1,
-                player.player_name,
-                player.team,
-                player.pts.unwrap(),
-                player.treb.unwrap(),
-                player.ast.unwrap(),
-            );
-        }
+        // for (i, player) in players.iter().enumerate().take(5) { // Iterate over the collected players
+        //     info!(
+        //         "{}. Player: {}, Team: {}, Pts: {:.1?}, Reb: {:.1?}, Ast: {:.1?}",
+        //         i + 1,
+        //         player.player_name,
+        //         player.team,
+        //         player.pts.unwrap(),
+        //         player.treb.unwrap(),
+        //         player.ast.unwrap(),
+        //     );
+        // }
         if players.len() > 5 {
             info!("... (and {} more)", players.len() - 5);
         }
@@ -293,17 +303,58 @@ async fn get_data() -> Result<Vec<PlayerStats>, Box<dyn Error>> {
     // the error was "Value used after being moved"
     for player in &players {
         if player.player_name == "Cooper Flagg" {
-            info!("{}", player.adjoe.unwrap());
+            info!("{}", player.usg.unwrap());
         }
     }
 
     Ok(players)
 }
 
+#[get("/api/hello")]
+async fn hello() -> impl Responder {
+    HttpResponse::Ok().body("Hello from Rust!")
+}
+
+#[get("/api/players")]
+async fn get_players(
+    db: web::Data<Session>,
+    query: web::Query<std::collections::HashMap<String, String>>,
+) -> impl Responder {
+    let team_code = match query.get("team") {
+        Some(code) => code.to_string(),
+        None => return HttpResponse::BadRequest().body("Missing team query param"),
+    };
+
+    let statement = db
+        .prepare(format!("SELECT * FROM {}.{} WHERE team = ?", KEYSPACE, TABLE))
+        .await
+        .unwrap();
+
+    let rows = db
+        .execute(&statement, (team_code,))
+        .await
+        .unwrap()
+        .rows
+        .unwrap();
+
+    let players: Vec<PlayerStats> = rows
+        .into_iter()
+        .map(PlayerStats::from_row)
+        .collect::<Result<_, _>>()
+        .unwrap();
+
+    HttpResponse::Ok().json(players)
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
 
     env_logger::init();
+
+    let db = connect_to_scylla().await;
+    let db_data = web::Data::new(db);
+
+    info!("🚀 Server running at http://localhost:8000");
 
     let mut players: Vec<PlayerStats> = get_data().await?;
 
@@ -312,5 +363,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
     players.clear();
 
     let scylla_db: Session = scylla(players).await?;
-    query_specific_player(scylla_db, "Duke", "Cooper Flagg").await
+    query_specific_player(scylla_db, "Duke", "Cooper Flagg").await;
+
+    HttpServer::new(move || {
+        App::new()
+            .app_data(db_data.clone())
+            .service(get_players)
+            .service(hello) // keep your old hello handler too
+    })
+        .bind(("0.0.0.0", 8000))?
+        .run()
+        .await;
+
+    Ok(())
 }

@@ -8,4 +8,9 @@
 /dataSources.local.xml
 *.idea
 .DS_STORE
-/target/
+
+# backend
+/backend/target/
+
+# frontend
+/frontend/node_modules
