@@ -1,3 +1,5 @@
+mod init_db;
+
 use reqwest; // Use the blocking client
 use csv::{ReaderBuilder, StringRecord, Reader}; // Import Reader explicitly
 use serde::{Deserialize, Serialize}; // Use serde for deserialization
@@ -6,85 +8,82 @@ use std::error::Error;
 use log::{error, warn, info, debug, trace, LevelFilter};
 // Import the `env_logger` initializer
 use env_logger;
-use scylla::{FromRow, IntoTypedRows, Session, SessionBuilder};
+use scylla::{FromRow, IntoTypedRows, SerializeRow, Session, SessionBuilder};
 use actix_web::{get, web, App, HttpServer, HttpResponse, Responder};
-
+use actix_web::body::MessageBody;
+use scylla::transport::session;
+use crate::init_db::init_db;
 
 // Define a struct that matches the columns you expect in the CSV.
-#[derive(Debug, Deserialize, Clone, FromRow, Serialize)]
-struct PlayerStats {
-    player_name: String,
-    team: String,
-    conf: String,
-    gp: Option<i32>,
-    min_per: Option<f64>,
-    o_rtg: Option<f64>,
-    usg: Option<f64>,
-    // e_fg: Option<f64>,
-    // ts_per: Option<f64>,
-    // orb_per: Option<f64>,
-    // drb_per: Option<f64>,
-    // ast_per: Option<f64>,
-    // to_per: Option<f64>,
-    // ftm: Option<i32>,
-    // fta: Option<i32>,
-    // ft_per: Option<f64>,
-    // two_pm: Option<i32>,
-    // two_pa: Option<i32>,
-    // two_p_per: Option<f64>,
-    // tpm: Option<i32>,
-    // tpa: Option<i32>,
-    // tp_per: Option<f64>,
-    // blk_per: Option<f64>,
-    // stl_per: Option<f64>,
-    // ftr: Option<f64>,
-    // yr: Option<String>,
-    // ht: Option<String>,
-    // num: Option<String>,
-    // porpag: Option<f64>,
-    // adjoe: Option<f64>,
-    // pfr: Option<f64>,
-    // year: Option<i32>,
-    // pid: Option<i32>,
-    // player_type: Option<String>, // Renamed from 'type' to avoid keyword clash
-    // rec_rank: Option<f64>,
-    // ast_tov: Option<f64>,
-    // rim_made: Option<f64>,
-    // rim_attempted: Option<f64>,
-    // mid_made: Option<f64>,
-    // mid_attempted: Option<f64>,
-    // rim_pct: Option<f64>,
-    // mid_pct: Option<f64>,
-    // dunks_made: Option<f64>,
-    // dunks_attempted: Option<f64>,
-    // dunk_pct: Option<f64>,
-    // pick: Option<f64>,
-    // drtg: Option<f64>,
-    // adrtg: Option<f64>,
-    // dporpag: Option<f64>,
-    // stops: Option<f64>,
-    // bpm: Option<f64>,
-    // obpm: Option<f64>,
-    // dbpm: Option<f64>,
-    // gbpm: Option<f64>,
-    // mp: Option<f64>,
-    // ogbpm: Option<f64>,
-    // dgbpm: Option<f64>,
-    // oreb: Option<f64>,
-    // dreb: Option<f64>,
-    // treb: Option<f64>,
-    // ast: Option<f64>,
-    // stl: Option<f64>,
-    // blk: Option<f64>,
-    // pts: Option<f64>,
+#[derive(Debug, Clone, Deserialize, Serialize, FromRow, SerializeRow)]
+pub struct PlayerStats {
+    pub player_name: String,
+    pub team: String,
+    pub conf: String,
+    pub gp: Option<i32>,
+    pub min_per: Option<f64>,
+    pub o_rtg: Option<f64>,
+    pub usg: Option<f64>,
+    pub e_fg: Option<f64>,
+    pub ts_per: Option<f64>,
+    pub orb_per: Option<f64>,
+    pub drb_per: Option<f64>,
+    pub ast_per: Option<f64>,
+    pub to_per: Option<f64>,
+    pub ftm: Option<i32>,
+    pub fta: Option<i32>,
+    pub ft_per: Option<f64>,
+    pub two_pm: Option<i32>,
+    pub two_pa: Option<i32>,
+    pub two_p_per: Option<f64>,
+    pub tpm: Option<i32>,
+    pub tpa: Option<i32>,
+    pub tp_per: Option<f64>,
+    pub blk_per: Option<f64>,
+    pub stl_per: Option<f64>,
+    pub ftr: Option<f64>,
+    pub yr: Option<String>,
+    pub ht: Option<String>,
+    pub num: Option<String>,
+    pub porpag: Option<f64>,
+    pub adjoe: Option<f64>,
+    pub pfr: Option<f64>,
+    pub year: Option<i32>,
+    pub pid: Option<i32>,
+    pub player_type: Option<String>,
+    pub rec_rank: Option<f64>,
+    pub ast_tov: Option<f64>,
+    pub rim_made: Option<f64>,
+    pub rim_attempted: Option<f64>,
+    pub mid_made: Option<f64>,
+    pub mid_attempted: Option<f64>,
+    pub rim_pct: Option<f64>,
+    pub mid_pct: Option<f64>,
+    pub dunks_made: Option<f64>,
+    pub dunks_attempted: Option<f64>,
+    pub dunk_pct: Option<f64>,
+    pub pick: Option<f64>,
+    pub drtg: Option<f64>,
+    pub adrtg: Option<f64>,
+    pub dporpag: Option<f64>,
+    pub stops: Option<f64>,
+    pub bpm: Option<f64>,
+    pub obpm: Option<f64>,
+    pub dbpm: Option<f64>,
+    pub gbpm: Option<f64>,
+    pub mp: Option<f64>,
+    pub ogbpm: Option<f64>,
+    pub dgbpm: Option<f64>,
+    pub oreb: Option<f64>,
+    pub dreb: Option<f64>,
+    pub treb: Option<f64>,
+    pub ast: Option<f64>,
+    pub stl: Option<f64>,
+    pub blk: Option<f64>,
+    pub pts: Option<f64>,
 }
 
-struct PlayerStats2 {
-    player_name: String,
-    usg: Option<f64>,
-}
-
-const KEYSPACE: &str = "player_analytics";
+const KEYSPACE: &str = "stats";
 const TABLE: &str = "player_stats";
 const NODE_ADDRESS: &str = "127.0.0.1:9042";
 
@@ -93,84 +92,14 @@ async fn connect_to_scylla() -> Session {
 
     info!("Connecting to ScyllaDB at {}...", NODE_ADDRESS);
 
-    SessionBuilder::new()
+    let session = SessionBuilder::new()
         .known_node(NODE_ADDRESS) // adjust if running in Docker
         .build()
         .await
-        .expect("Failed to connect to ScyllaDB")
-}
-
-async fn scylla(players:Vec<PlayerStats>) -> Result<Session, Box<dyn Error>> {
-
-    let session = connect_to_scylla().await;
-
-    // 2. Create Keyspace (if it doesn't exist)
-    let create_keyspace_cql = format!(
-        "CREATE KEYSPACE IF NOT EXISTS {} WITH REPLICATION = {{'class': 'SimpleStrategy', 'replication_factor': 1}}",
-        KEYSPACE
-    );
-    session.query(create_keyspace_cql, &[]).await?;
-    info!("Keyspace '{}' ensured.", KEYSPACE);
-
-    // Use the keyspace for subsequent operations
-    session.use_keyspace(KEYSPACE, true).await?;
-
-    // 3. Create Table (if it doesn't exist)
-    //    IMPORTANT: Choose a primary key suitable for your data model.
-    //    Here, we use (team, player_name) assuming a player on a specific team is unique.
-    //    `team` is the partition key (determines data distribution).
-    //    `player_name` is the clustering key (determines order within a partition).
-    let create_table_cql = format!(
-        "CREATE TABLE IF NOT EXISTS {} (
-            player_name TEXT,
-            team TEXT,
-            conf TEXT,
-            gp INT,         // Scylla INT can store i32 fine
-            min_per DOUBLE, // Scylla DOUBLE maps well to f64
-            o_rtg DOUBLE,
-            usg DOUBLE,
-            PRIMARY KEY ((team), player_name) // Composite Primary Key: Partition by team, cluster by player_name
-        )",
-        TABLE
-    );
-    session.query(create_table_cql, &[]).await?;
-    info!("Table '{}.{}' ensured.", KEYSPACE, TABLE);
-
-    // TODO: get the data here
-    // DONE - passed in as arg
-
-    // 5. Prepare the INSERT statement for efficiency
-    let insert_cql = format!(
-        "INSERT INTO {} (player_name, team, conf, gp, min_per, o_rtg, usg) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        TABLE
-    );
-    let prepared_insert = session.prepare(insert_cql).await?;
-    info!("Prepared INSERT statement.");
-
-    // 6. Iterate and Insert Data
-    info!("Inserting player data...");
-    for player in players {
-        info!("Inserting stats for: {}", player.player_name);
-        // The driver handles Option<T> correctly, mapping None to NULL.
-        // The order of values in the tuple MUST match the order of '?' in the CQL.
-        session
-            .execute(
-                &prepared_insert,
-                (
-                    &player.player_name, // Use references where possible
-                    &player.team,
-                    &player.conf,
-                    player.gp,        // Pass Option<i32> directly
-                    player.min_per,   // Pass Option<f64> directly
-                    player.o_rtg,
-                    player.usg,
-                ),
-            )
-            .await?;
-    }
-
-    info!("Data insertion complete!");
-    Ok(session)
+        .expect("Failed to connect to ScyllaDB");
+    
+    session.use_keyspace(KEYSPACE, true).await.expect("TODO: panic message");
+    session
 }
 
 async fn query_specific_player(session: Session, team_name: &str, player_name_filter: &str) -> Result<(), Box<dyn Error>> {
@@ -281,17 +210,17 @@ async fn get_data() -> Result<Vec<PlayerStats>, Box<dyn Error>> {
     // Optional: Print details of the first few collected players
     if !players.is_empty() {
         info!("\nFirst few players collected:");
-        // for (i, player) in players.iter().enumerate().take(5) { // Iterate over the collected players
-        //     info!(
-        //         "{}. Player: {}, Team: {}, Pts: {:.1?}, Reb: {:.1?}, Ast: {:.1?}",
-        //         i + 1,
-        //         player.player_name,
-        //         player.team,
-        //         player.pts.unwrap(),
-        //         player.treb.unwrap(),
-        //         player.ast.unwrap(),
-        //     );
-        // }
+        for (i, player) in players.iter().enumerate().take(5) { // Iterate over the collected players
+            info!(
+                "{}. Player: {}, Team: {}, Pts: {:.1?}, Reb: {:.1?}, Ast: {:.1?}",
+                i + 1,
+                player.player_name,
+                player.team,
+                player.pts.unwrap(),
+                player.treb.unwrap(),
+                player.ast.unwrap(),
+            );
+        }
         if players.len() > 5 {
             info!("... (and {} more)", players.len() - 5);
         }
@@ -310,6 +239,38 @@ async fn get_data() -> Result<Vec<PlayerStats>, Box<dyn Error>> {
     Ok(players)
 }
 
+pub async fn insert_player_stats(
+    session: &Session,
+    players: &[PlayerStats],
+) -> Result<(), scylla::transport::errors::QueryError> {
+    let query = r#"
+    INSERT INTO stats.player_stats (
+        player_name, team, conf, gp, min_per, o_rtg, usg, e_fg, ts_per, orb_per,
+        drb_per, ast_per, to_per, ftm, fta, ft_per, two_pm, two_pa, two_p_per,
+        tpm, tpa, tp_per, blk_per, stl_per, ftr, yr, ht, num, porpag, adjoe, pfr,
+        year, pid, player_type, rec_rank, ast_tov, rim_made, rim_attempted,
+        mid_made, mid_attempted, rim_pct, mid_pct, dunks_made, dunks_attempted,
+        dunk_pct, pick, drtg, adrtg, dporpag, stops, bpm, obpm, dbpm, gbpm, mp,
+        ogbpm, dgbpm, oreb, dreb, treb, ast, stl, blk, pts
+    ) VALUES (
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+    )
+"#;
+
+    let prepared = session.prepare(query).await?;
+    for p in players {
+        session.execute(&prepared, &p).await?;
+    }
+
+    Ok(())
+}
+
 #[get("/api/hello")]
 async fn hello() -> impl Responder {
     HttpResponse::Ok().body("Hello from Rust!")
@@ -321,27 +282,55 @@ async fn get_players(
     query: web::Query<std::collections::HashMap<String, String>>,
 ) -> impl Responder {
     let team_code = match query.get("team") {
-        Some(code) => code.to_string(),
-        None => return HttpResponse::BadRequest().body("Missing team query param"),
+        Some(code) => code,
+        None => return HttpResponse::BadRequest().body("Missing 'team' query param"),
     };
 
-    let statement = db
-        .prepare(format!("SELECT * FROM {}.{} WHERE team = ?", KEYSPACE, TABLE))
-        .await
-        .unwrap();
+    let year = match query.get("year") {
+        Some(y) => match y.parse::<i32>() {
+            Ok(n) => n,
+            Err(_) => return HttpResponse::BadRequest().body("Invalid 'year' query param"),
+        },
+        None => return HttpResponse::BadRequest().body("Missing 'year' query param"),
+    };
 
-    let rows = db
-        .execute(&statement, (team_code,))
-        .await
-        .unwrap()
-        .rows
-        .unwrap();
+    let query = r#"
+    SELECT player_name, team, conf, gp, min_per, o_rtg, usg, e_fg, ts_per, orb_per,
+           drb_per, ast_per, to_per, ftm, fta, ft_per, two_pm, two_pa, two_p_per,
+           tpm, tpa, tp_per, blk_per, stl_per, ftr, yr, ht, num, porpag, adjoe, pfr,
+           year, pid, player_type, rec_rank, ast_tov, rim_made, rim_attempted,
+           mid_made, mid_attempted, rim_pct, mid_pct, dunks_made, dunks_attempted,
+           dunk_pct, pick, drtg, adrtg, dporpag, stops, bpm, obpm, dbpm, gbpm, mp,
+           ogbpm, dgbpm, oreb, dreb, treb, ast, stl, blk, pts
+    FROM stats.player_stats WHERE team = ? AND year = ?
+"#.to_string();
+    let statement = match db.prepare(query).await {
+        Ok(stmt) => stmt,
+        Err(e) => return HttpResponse::InternalServerError().body(format!("Failed to prepare: {e}")),
+    };
 
-    let players: Vec<PlayerStats> = rows
-        .into_iter()
-        .map(PlayerStats::from_row)
-        .collect::<Result<_, _>>()
-        .unwrap();
+    let result = db.execute(&statement, (team_code.as_str(), year)).await;
+
+    let rows = match result {
+        Ok(res) => res.rows.unwrap_or_default(),
+        Err(e) => {
+            error!("Failed to query Scylla: {e}");
+            return HttpResponse::InternalServerError().body(format!("Query failed: {e}"));
+        }
+    };
+
+    info!("Returned {} rows", rows.len());
+
+    let mut players: Vec<PlayerStats> = Vec::new();
+
+    for (i, row) in rows.into_iter().enumerate() {
+        match PlayerStats::from_row(row) {
+            Ok(player) => players.push(player),
+            Err(e) => {
+                error!("Row {} failed to convert: {}", i, e);
+            }
+        }
+    }
 
     HttpResponse::Ok().json(players)
 }
@@ -350,9 +339,9 @@ async fn get_players(
 async fn main() -> Result<(), Box<dyn Error>> {
 
     env_logger::init();
+    init_db().await.expect("DB setup failed");
 
     let db = connect_to_scylla().await;
-    let db_data = web::Data::new(db);
 
     info!("🚀 Server running at http://localhost:8000");
 
@@ -360,10 +349,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     info!("Players collected: {}", players.len());
 
-    players.clear();
+    insert_player_stats(&db, &players).await?;
 
-    let scylla_db: Session = scylla(players).await?;
-    query_specific_player(scylla_db, "Duke", "Cooper Flagg").await;
+    // query_specific_player(scylla_db, "Duke", "Cooper Flagg").await;
+
+    let db_data = web::Data::new(db);
 
     HttpServer::new(move || {
         App::new()
