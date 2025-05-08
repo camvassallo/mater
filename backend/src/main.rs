@@ -363,7 +363,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     })
         .bind(("0.0.0.0", 8000))?
         .run()
-        .await;
+        .await.expect("Failed to start API listener");
 
     Ok(())
 }
