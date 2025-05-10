@@ -91,6 +91,60 @@ pub async fn init_db() -> Result<(),  scylla::transport::errors::NewSessionError
         )
         .await?;
 
+    session
+        .query(
+            "CREATE TABLE IF NOT EXISTS stats.team_stats (
+            rank int,
+            team text,
+            conf text,
+            record text,
+            adjoe double,
+            adjoe_rank int,
+            adjde double,
+            adjde_rank int,
+            barthag double,
+            barthag_rank int,
+            proj_wins int,
+            proj_losses int,
+            proj_conf_wins int,
+            proj_conf_losses int,
+            conf_record text,
+            sos double,
+            nconf_sos double,
+            conf_sos double,
+            proj_sos double,
+            proj_nconf_sos double,
+            proj_conf_sos double,
+            elite_sos double,
+            elite_ncsos double,
+            opp_adjoe double,
+            opp_adjde double,
+            opp_proj_adjoe double,
+            opp_proj_adjde double,
+            conf_adjoe double,
+            conf_adjde double,
+            qual_adjoe double,
+            qual_adjde double,
+            qual_barthag double,
+            qual_games int,
+            fun double,
+            conf_pf float,
+            conf_pa float,
+            conf_poss double,
+            conf_adj_o double,
+            conf_adj_d double,
+            conf_sos_remain double,
+            conf_win_perc double,
+            wab double,
+            wab_rank int,
+            fun_rank int,
+            adj_tempo double,
+            PRIMARY KEY ((team), rank)
+        );",
+            &[],
+        )
+        .await?;
+
     info!("✅ Keyspace and table are ready.");
     Ok(())
 }

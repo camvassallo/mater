@@ -1,5 +1,4 @@
-mod init_db;
-
+// functional imports
 use reqwest; // Use the blocking client
 use csv::{ReaderBuilder, StringRecord, Reader}; // Import Reader explicitly
 use serde::{Deserialize, Serialize}; // Use serde for deserialization
@@ -12,6 +11,11 @@ use scylla::{FromRow, IntoTypedRows, SerializeRow, Session, SessionBuilder};
 use actix_web::{get, web, App, HttpServer, HttpResponse, Responder};
 use actix_web::body::MessageBody;
 use scylla::transport::session;
+
+// method imports
+mod init_db;
+mod get_team_stats;
+use crate::get_team_stats::{get_team_stats, insert_team_stats};
 use crate::init_db::init_db;
 
 // Define a struct that matches the columns you expect in the CSV.
@@ -335,6 +339,50 @@ async fn get_players(
     HttpResponse::Ok().json(players)
 }
 
+#[get("/api/team-stats")]
+async fn get_team_stats_endpoint(
+    db: web::Data<Session>,
+) -> impl Responder {
+    let query = r#"
+        SELECT rank, team, conf, record, adjoe, adjoe_rank, adjde, adjde_rank, barthag, barthag_rank,
+               proj_wins, proj_losses, proj_conf_wins, proj_conf_losses, conf_record,
+               sos, nconf_sos, conf_sos, proj_sos, proj_nconf_sos, proj_conf_sos,
+               elite_sos, elite_ncsos, opp_adjoe, opp_adjde, opp_proj_adjoe, opp_proj_adjde,
+               conf_adjoe, conf_adjde, qual_adjoe, qual_adjde, qual_barthag, qual_games,
+               fun, conf_pf, conf_pa, conf_poss, conf_adj_o, conf_adj_d, conf_sos_remain,
+               conf_win_perc, wab, wab_rank, fun_rank, adj_tempo
+        FROM stats.team_stats
+    "#;
+
+    let prepared = match db.prepare(query).await {
+        Ok(stmt) => stmt,
+        Err(e) => {
+            error!("Failed to prepare query: {}", e);
+            return HttpResponse::InternalServerError().body("Failed to prepare query");
+        }
+    };
+
+    let result = db.execute(&prepared, ()).await;
+
+    let rows = match result {
+        Ok(res) => res.rows.unwrap_or_default(),
+        Err(e) => {
+            error!("Failed to query team stats: {}", e);
+            return HttpResponse::InternalServerError().body("Query failed");
+        }
+    };
+
+    let mut stats = Vec::new();
+    for (i, row) in rows.into_iter().enumerate() {
+        match get_team_stats::TeamStats::from_row(row) {
+            Ok(stat) => stats.push(stat),
+            Err(e) => error!("Failed to parse row {}: {}", i, e),
+        }
+    }
+
+    HttpResponse::Ok().json(stats)
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
 
@@ -353,12 +401,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // query_specific_player(scylla_db, "Duke", "Cooper Flagg").await;
 
+    get_team_stats().await.expect("Failed to get Torvik team data");
+
+    let team_stats = get_team_stats().await?;
+    info!("Inserting {} team stats into ScyllaDB", team_stats.len());
+    insert_team_stats(&db, &team_stats).await?;
+
     let db_data = web::Data::new(db);
 
     HttpServer::new(move || {
         App::new()
             .app_data(db_data.clone())
             .service(get_players)
+            .service(get_team_stats_endpoint)
             .service(hello) // keep your old hello handler too
     })
         .bind(("0.0.0.0", 8000))?
