@@ -380,6 +380,8 @@ async fn get_team_stats_endpoint(
         }
     }
 
+    stats.sort_by_key(|s| s.rank);
+
     HttpResponse::Ok().json(stats)
 }
 
