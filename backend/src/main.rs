@@ -336,6 +336,10 @@ async fn get_players(
         }
     }
 
+    players.sort_by(|a, b| {
+        b.mp.partial_cmp(&a.mp).unwrap_or(std::cmp::Ordering::Equal)
+    });
+
     HttpResponse::Ok().json(players)
 }
 
