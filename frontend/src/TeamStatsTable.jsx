@@ -25,7 +25,8 @@ const TeamStatsTable = () => {
         { field: 'rank' },
         {
             field: 'team',
-            cellRenderer: TeamLinkRenderer
+            cellRenderer: TeamLinkRenderer,
+            minWidth: 200
         },
         { field: 'conf' },
         { field: 'record' },
@@ -52,9 +53,16 @@ const TeamStatsTable = () => {
                     <AgGridReact
                         rowData={rowData}
                         columnDefs={columnDefs}
-                        defaultColDef={{ sortable: true, filter: true, resizable: true }}
+                        defaultColDef={{
+                            sortable: true,
+                            filter: true,
+                            resizable: true,
+                            minWidth: 75,
+                            flex: 1,
+                        }}
                         pagination={true}
                         paginationPageSize={20}
+                        className="ag-theme-quartz ag-theme-compact" // ✅ this applies your CSS
                         theme={themeQuartz.withPart(colorSchemeDarkBlue)}
                     />
                 </div>

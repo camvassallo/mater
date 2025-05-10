@@ -22,7 +22,7 @@ const PlayersTable = ({ team, year }) => {
     const [rowData, setRowData] = useState([]);
 
     const columnDefs = useMemo(() => [
-        { headerName: 'Name', field: 'player_name'},
+        { headerName: 'Name', field: 'player_name', minWidth: 200},
         { field: 'team' },
         { field: 'conf' },
         { field: 'gp' },
@@ -105,14 +105,23 @@ const PlayersTable = ({ team, year }) => {
             <div className="container">
                 <h1 className="title is-3 has-text-centered">{team} Players ({year})</h1>
                 <div style={{height: 'calc(100vh - 100px)', width: '100%'}}>
-                    <AgGridReact
-                        rowData={rowData}
-                        columnDefs={columnDefs}
-                        defaultColDef={{sortable: true, filter: true, resizable: true}}
-                        pagination={true}
-                        paginationPageSize={15}
-                        theme={themeQuartz.withPart(colorSchemeDarkBlue)}
-                    />
+                    <div style={{height: 'calc(100vh - 100px)', width: '100%'}}>
+                        <AgGridReact
+                            rowData={rowData}
+                            columnDefs={columnDefs}
+                            defaultColDef={{
+                                sortable: true,
+                                filter: true,
+                                resizable: true,
+                                minWidth: 100, // was 80+
+                                flex: 1,
+                            }}
+                            pagination={true}
+                            paginationPageSize={20}
+                            className="ag-theme-quartz ag-theme-compact" // ✅ this applies your CSS
+                            theme={themeQuartz.withPart(colorSchemeDarkBlue)}
+                        />
+                    </div>
                 </div>
             </div>
         </div>

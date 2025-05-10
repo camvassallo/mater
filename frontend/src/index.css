@@ -88,3 +88,29 @@ body,
   min-width: 1200px;
   overflow-x: auto;
 }
+
+.ag-theme-compact .ag-root {
+  font-size: 10.5px; /* was 12px */
+}
+
+.ag-theme-compact .ag-header-cell-label {
+  font-size: 10px;   /* was 11px */
+}
+
+.ag-theme-compact .ag-cell {
+  padding: 1px 3px;  /* was 2px 4px */
+}
+
+.ag-theme-compact .ag-header-cell {
+  padding-left: 4px !important;
+  padding-right: 4px !important;
+}
+
+.ag-theme-compact .ag-header {
+  min-height: 28px;  /* shrink header height */
+}
+
+.ag-theme-compact .ag-row {
+  line-height: 1.1;
+  min-height: 26px !important;  /* shrink row height */
+}
