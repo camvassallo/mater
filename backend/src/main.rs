@@ -323,7 +323,7 @@ async fn get_players(
         }
     };
 
-    info!("Returned {} rows", rows.len());
+    info!("Returned {} rows for team {}", rows.len(), team_code.as_str());
 
     let mut players: Vec<PlayerStats> = Vec::new();
 

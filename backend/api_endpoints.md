@@ -30,3 +30,8 @@ gamevalue, mismatch, blowout, t1elite, t2elite, ord_date, t1ppp, t2ppp, gameppp,
 t1rk, t2rk, t1gs, t2gs, gamestats, overtimes, t1fun, t2fun, results] #46-54
 
 https://barttorvik.com/2025_super_sked.csv
+
+
+### player game result output format:
+
+["20250318", "3-18", "", "", 0, "North Carolina", "North CarolinaSan Diego St.3-18", 0, 24.4, 83.3, 24.7, 41.7, 45.9, 4.3, 22.6, 8.3, 18.7, 0, 0, 0, 1, 1, 3, 1.0, 4.0, 1.0, 2.0, 4.0, 8.0, -1.8, -3.0728934827089, 1.2919875699202121, -2.0, 9, 1.0, 4.0, 1.0, 2.0, 1.0, 2.0, 2.3, 9.9, 3.0, 70.1625, -1.780905912788688, -1.957570283875219, "", "San Diego St.", "Magoon Gwath", 84, "So", 78523, 2025], 
