@@ -1389,10 +1389,12 @@ dependencies = [
  "actix-web",
  "csv",
  "env_logger",
+ "flate2",
  "log",
  "reqwest",
  "scylla",
  "serde",
+ "serde_json",
  "tokio",
 ]
 

@@ -1,15 +1,13 @@
 use log::info;
-use scylla::SessionBuilder; // Removed Session as it's not directly used here
+use scylla::SessionBuilder;
 
 pub async fn init_db() -> Result<(), scylla::transport::errors::NewSessionError> {
 
-    // Connect to ScyllaDB
     let session = SessionBuilder::new()
-        .known_node("127.0.0.1:9042") // or your Docker IP
+        .known_node("127.0.0.1:9042")
         .build()
         .await?;
 
-    // Create keyspace
     session
         .query(
             "CREATE KEYSPACE IF NOT EXISTS stats WITH replication = { 'class': 'SimpleStrategy', 'replication_factor': 1 };",
@@ -17,7 +15,6 @@ pub async fn init_db() -> Result<(), scylla::transport::errors::NewSessionError>
         )
         .await?;
 
-    // Create table
     session
         .query(
             "CREATE TABLE IF NOT EXISTS stats.player_stats (
@@ -145,6 +142,68 @@ pub async fn init_db() -> Result<(), scylla::transport::errors::NewSessionError>
         )
         .await?;
 
-    info!("✅ Keyspace and table are ready.");
+    session
+        .query(
+            "CREATE TABLE IF NOT EXISTS stats.game_stats (
+                numdate text,
+                datetext text,
+                opstyle int,
+                quality int,
+                win1 int,
+                opponent text,
+                muid text,
+                win2 int,
+                min_per double,
+                o_rtg double,
+                usage double,
+                e_fg double,
+                ts_per double,
+                orb_per double,
+                drb_per double,
+                ast_per double,
+                to_per double,
+                dunks_made int,
+                dunks_att int,
+                rim_made int,
+                rim_att int,
+                mid_made int,
+                mid_att int,
+                two_pm int,
+                two_pa int,
+                tpm int,
+                tpa int,
+                ftm int,
+                fta int,
+                bpm_rd double,
+                obpm double,
+                dbpm double,
+                bpm_net double,
+                pts double,
+                orb double,
+                drb double,
+                ast double,
+                tov double,
+                stl double,
+                blk double,
+                stl_per double,
+                blk_per double,
+                pf double,
+                possessions double,
+                bpm double,
+                sbpm double,
+                loc text,
+                tt text,
+                pp text,
+                inches int,
+                cls text,
+                pid int,
+                year int,
+                PRIMARY KEY ((pid, year, tt), numdate)
+            );",
+            &[],
+        )
+        .await?;
+
+    info!("✅ Keyspaces and tables are ready.");
     Ok(())
 }

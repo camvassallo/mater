@@ -2,18 +2,20 @@ use std::error::Error;
 use log::{error, info};
 use env_logger;
 use actix_web::{get, web, App, HttpServer, HttpResponse, Responder};
-use scylla::{Session, FromRow}; // Added FromRow
+use scylla::{Session, FromRow};
 
-// method imports
+// module imports
 mod init_db;
 mod get_team_stats;
-mod get_player_stats; // New module for player stats
-mod db_utils;       // New module for database utilities
+mod get_player_stats;
+mod db_utils;
+mod get_game_stats;
 
 use crate::get_team_stats::{get_team_stats, insert_team_stats, TeamStats};
 use crate::get_player_stats::{get_player_data, insert_player_stats, PlayerStats};
 use crate::init_db::init_db;
 use crate::db_utils::{connect_to_scylla, query_specific_player, get_players_from_db};
+use crate::get_game_stats::{get_game_data, insert_game_stats, GameStats};
 
 
 #[get("/api/hello")]
@@ -104,6 +106,72 @@ async fn get_team_stats_endpoint(
     HttpResponse::Ok().json(stats)
 }
 
+#[get("/api/game-stats")]
+async fn get_game_stats_endpoint(
+    db: web::Data<Session>,
+    query: web::Query<std::collections::HashMap<String, String>>,
+) -> impl Responder {
+    let pid = match query.get("pid") {
+        Some(p) => match p.parse::<i32>() {
+            Ok(n) => n,
+            Err(_) => return HttpResponse::BadRequest().body("Invalid 'pid' query param"),
+        },
+        None => return HttpResponse::BadRequest().body("Missing 'pid' query param"),
+    };
+
+    let year = match query.get("year") {
+        Some(y) => match y.parse::<i32>() {
+            Ok(n) => n,
+            Err(_) => return HttpResponse::BadRequest().body("Invalid 'year' query param"),
+        },
+        None => return HttpResponse::BadRequest().body("Missing 'year' query param"),
+    };
+
+    let team = match query.get("team") {
+        Some(t) => t.to_string(),
+        None => return HttpResponse::BadRequest().body("Missing 'team' query param"),
+    };
+
+    let query_cql = r#"
+        SELECT numdate, datetext, opstyle, quality, win1, opponent, muid, win2, min_per, o_rtg, usage,
+               e_fg, ts_per, orb_per, drb_per, ast_per, to_per, dunks_made, dunks_att, rim_made,
+               rim_att, mid_made, mid_att, two_pm, two_pa, tpm, tpa, ftm, fta, bpm_rd, obpm,
+               dbpm, bpm_net, pts, orb, drb, ast, tov, stl, blk, stl_per, blk_per, pf,
+               possessions, bpm, sbpm, loc, tt, pp, inches, cls, pid, year
+        FROM stats.game_stats WHERE pid = ? AND year = ? AND tt = ?
+    "#;
+
+    let prepared = match db.prepare(query_cql).await {
+        Ok(stmt) => stmt,
+        Err(e) => {
+            error!("Failed to prepare query: {}", e);
+            return HttpResponse::InternalServerError().body("Failed to prepare query");
+        }
+    };
+
+    let result = db.execute(&prepared, (pid, year, team.as_str())).await;
+
+    let rows = match result {
+        Ok(res) => res.rows.unwrap_or_default(),
+        Err(e) => {
+            error!("Failed to query game stats: {}", e);
+            return HttpResponse::InternalServerError().body("Query failed");
+        }
+    };
+
+    let mut game_stats = Vec::new();
+    for (i, row) in rows.into_iter().enumerate() {
+        match GameStats::from_row(row) {
+            Ok(stat) => game_stats.push(stat),
+            Err(e) => error!("Failed to parse row {}: {}", i, e),
+        }
+    }
+
+    game_stats.sort_by(|a, b| a.numdate.cmp(&b.numdate));
+
+    HttpResponse::Ok().json(game_stats)
+}
+
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -124,6 +192,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     info!("Inserting {} team stats into ScyllaDB", team_stats.len());
     insert_team_stats(&db, &team_stats).await?;
 
+    let game_stats = get_game_data().await?;
+    info!("Inserting {} game stats into ScyllaDB", game_stats.len());
+    insert_game_stats(&db, &game_stats).await?;
+
+
     let db_data = web::Data::new(db);
 
     HttpServer::new(move || {
@@ -131,6 +204,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .app_data(db_data.clone())
             .service(get_players_endpoint)
             .service(get_team_stats_endpoint)
+            .service(get_game_stats_endpoint)
             .service(hello)
     })
         .bind(("0.0.0.0", 8000))?
