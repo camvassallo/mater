@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { themeQuartz, colorSchemeDarkBlue } from 'ag-grid-community';
 import { AgGridReact } from 'ag-grid-react';
+import { Link } from 'react-router-dom'; // NEW: Import Link
 import {
     ModuleRegistry,
     ClientSideRowModelModule,
@@ -22,7 +23,25 @@ const PlayersTable = ({ team, year }) => {
     const [rowData, setRowData] = useState([]);
 
     const columnDefs = useMemo(() => [
-        { headerName: 'Name', field: 'player_name', minWidth: 200},
+        {
+            headerName: 'Name',
+            field: 'player_name',
+            minWidth: 200,
+            // NEW: Make player_name a clickable link
+            cellRenderer: (params) => {
+                // Check if pid is available before rendering the link
+                if (params.data && params.data.pid) {
+                    // Assuming 'team' and 'year' are available from the PlayersTable props
+                    // and 'pid' is available in the row data.
+                    const team = encodeURIComponent(params.data.team); // Use data.team to be safe
+                    const year = encodeURIComponent(params.data.year); // Use data.year to be safe
+                    const pid = encodeURIComponent(params.data.pid);
+                    const playerName = params.value;
+                    return <Link to={`/player/${team}/${year}/${pid}`}>{playerName}</Link>;
+                }
+                return params.value; // If no PID, render as plain text
+            }
+        },
         { field: 'team' },
         { field: 'conf' },
         { field: 'gp' },
@@ -54,7 +73,7 @@ const PlayersTable = ({ team, year }) => {
         { field: 'adjoe', valueFormatter: numberFormatter },
         { field: 'pfr', valueFormatter: numberFormatter },
         { field: 'year' },
-        { field: 'pid' },
+        { field: 'pid' }, // Make sure PID is fetched and available in rowData
         { field: 'player_type' },
         { field: 'rec_rank', valueFormatter: numberFormatter },
         { field: 'ast_tov', valueFormatter: numberFormatter },
@@ -98,7 +117,7 @@ const PlayersTable = ({ team, year }) => {
             .catch(console.error);
     }, [team, year]);
 
-    console.log(rowData)
+    console.log(rowData) //
 
     return (
         <div className="section">
