@@ -1,9 +1,7 @@
 use std::error::Error;
 use log::info;
 use serde::{Deserialize, Serialize};
-use scylla::{Session, SerializeRow, FromRow};
-use scylla::transport::errors::QueryError;
-
+use scylla::{Session, SerializeRow, FromRow}; // FromRow is already here
 
 #[derive(Debug, Clone, Serialize, Deserialize, SerializeRow, FromRow)]
 pub struct TeamStats {
@@ -65,7 +63,7 @@ pub async fn get_team_stats() -> Result<Vec<TeamStats>, Box<dyn Error>> {
 pub async fn insert_team_stats(
     session: &Session,
     teams: &[TeamStats],
-) -> Result<(), QueryError> {
+) -> Result<(), scylla::transport::errors::QueryError> {
     let query = r#"
         INSERT INTO stats.team_stats (
             rank, team, conf, record, adjoe, adjoe_rank, adjde, adjde_rank, barthag, barthag_rank,

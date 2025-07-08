@@ -1,7 +1,7 @@
 use log::info;
-use scylla::{Session, SessionBuilder};
+use scylla::SessionBuilder; // Removed Session as it's not directly used here
 
-pub async fn init_db() -> Result<(),  scylla::transport::errors::NewSessionError> {
+pub async fn init_db() -> Result<(), scylla::transport::errors::NewSessionError> {
 
     // Connect to ScyllaDB
     let session = SessionBuilder::new()

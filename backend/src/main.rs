@@ -1,279 +1,20 @@
-// functional imports
-use reqwest; // Use the blocking client
-use csv::{ReaderBuilder, StringRecord, Reader}; // Import Reader explicitly
-use serde::{Deserialize, Serialize}; // Use serde for deserialization
 use std::error::Error;
-// Import the logging macros from the `log` crate
-use log::{error, warn, info, debug, trace, LevelFilter};
-// Import the `env_logger` initializer
+use log::{error, info};
 use env_logger;
-use scylla::{FromRow, IntoTypedRows, SerializeRow, Session, SessionBuilder};
 use actix_web::{get, web, App, HttpServer, HttpResponse, Responder};
-use actix_web::body::MessageBody;
-use scylla::transport::session;
+use scylla::{Session, FromRow}; // Added FromRow
 
 // method imports
 mod init_db;
 mod get_team_stats;
-use crate::get_team_stats::{get_team_stats, insert_team_stats};
+mod get_player_stats; // New module for player stats
+mod db_utils;       // New module for database utilities
+
+use crate::get_team_stats::{get_team_stats, insert_team_stats, TeamStats};
+use crate::get_player_stats::{get_player_data, insert_player_stats, PlayerStats};
 use crate::init_db::init_db;
+use crate::db_utils::{connect_to_scylla, query_specific_player, get_players_from_db};
 
-// Define a struct that matches the columns you expect in the CSV.
-#[derive(Debug, Clone, Deserialize, Serialize, FromRow, SerializeRow)]
-pub struct PlayerStats {
-    pub player_name: String,
-    pub team: String,
-    pub conf: String,
-    pub gp: Option<i32>,
-    pub min_per: Option<f64>,
-    pub o_rtg: Option<f64>,
-    pub usg: Option<f64>,
-    pub e_fg: Option<f64>,
-    pub ts_per: Option<f64>,
-    pub orb_per: Option<f64>,
-    pub drb_per: Option<f64>,
-    pub ast_per: Option<f64>,
-    pub to_per: Option<f64>,
-    pub ftm: Option<i32>,
-    pub fta: Option<i32>,
-    pub ft_per: Option<f64>,
-    pub two_pm: Option<i32>,
-    pub two_pa: Option<i32>,
-    pub two_p_per: Option<f64>,
-    pub tpm: Option<i32>,
-    pub tpa: Option<i32>,
-    pub tp_per: Option<f64>,
-    pub blk_per: Option<f64>,
-    pub stl_per: Option<f64>,
-    pub ftr: Option<f64>,
-    pub yr: Option<String>,
-    pub ht: Option<String>,
-    pub num: Option<String>,
-    pub porpag: Option<f64>,
-    pub adjoe: Option<f64>,
-    pub pfr: Option<f64>,
-    pub year: Option<i32>,
-    pub pid: Option<i32>,
-    pub player_type: Option<String>,
-    pub rec_rank: Option<f64>,
-    pub ast_tov: Option<f64>,
-    pub rim_made: Option<f64>,
-    pub rim_attempted: Option<f64>,
-    pub mid_made: Option<f64>,
-    pub mid_attempted: Option<f64>,
-    pub rim_pct: Option<f64>,
-    pub mid_pct: Option<f64>,
-    pub dunks_made: Option<f64>,
-    pub dunks_attempted: Option<f64>,
-    pub dunk_pct: Option<f64>,
-    pub pick: Option<f64>,
-    pub drtg: Option<f64>,
-    pub adrtg: Option<f64>,
-    pub dporpag: Option<f64>,
-    pub stops: Option<f64>,
-    pub bpm: Option<f64>,
-    pub obpm: Option<f64>,
-    pub dbpm: Option<f64>,
-    pub gbpm: Option<f64>,
-    pub mp: Option<f64>,
-    pub ogbpm: Option<f64>,
-    pub dgbpm: Option<f64>,
-    pub oreb: Option<f64>,
-    pub dreb: Option<f64>,
-    pub treb: Option<f64>,
-    pub ast: Option<f64>,
-    pub stl: Option<f64>,
-    pub blk: Option<f64>,
-    pub pts: Option<f64>,
-}
-
-const KEYSPACE: &str = "stats";
-const TABLE: &str = "player_stats";
-const NODE_ADDRESS: &str = "127.0.0.1:9042";
-
-
-async fn connect_to_scylla() -> Session {
-
-    info!("Connecting to ScyllaDB at {}...", NODE_ADDRESS);
-
-    let session = SessionBuilder::new()
-        .known_node(NODE_ADDRESS) // adjust if running in Docker
-        .build()
-        .await
-        .expect("Failed to connect to ScyllaDB");
-    
-    session.use_keyspace(KEYSPACE, true).await.expect("TODO: panic message");
-    session
-}
-
-async fn query_specific_player(session: Session, team_name: &str, player_name_filter: &str) -> Result<(), Box<dyn Error>> {
-    info!("\nQuerying for player '{}' on team '{}'...", player_name_filter, team_name);
-
-    // 1. Define CQL with placeholders for team and player_name
-    let select_cql = format!(
-        "SELECT player_name, team, gp FROM {} WHERE team = ? AND player_name = ? LIMIT 1", // Added WHERE clause and LIMIT 1
-        TABLE
-    );
-
-    // 2. Execute the query, passing values in a tuple
-    //    The order in the tuple MUST match the order of '?' in the CQL
-    if let Some(rows) = session
-        .query(select_cql, (team_name, player_name_filter)) // Pass values here
-        .await?
-        .rows
-    {
-        if rows.is_empty() {
-            warn!("No player found matching Name='{}' and Team='{}'", player_name_filter, team_name);
-        } else {
-            // Expecting only one row due to primary key uniqueness or LIMIT 1
-            for row in rows.into_typed::<(String, String, Option<i32>)>() { // Types match SELECT clause
-                match row {
-                    Ok((name, team, gp)) => {
-                        info!("Retrieved: Name={}, Team={}, GP={:?}", name, team, gp)
-                    }
-                    Err(e) => error!("Error parsing row: {}", e),
-                }
-            }
-        }
-    } else {
-        info!("Query returned no rows structure for Name='{}' and Team='{}'", player_name_filter, team_name);
-    }
-
-    Ok(())
-}
-
-async fn get_data() -> Result<Vec<PlayerStats>, Box<dyn Error>> {
-    // The URL - using 2024 data as 2025 might not be available yet
-    // Using csv=0 as csv=1 might add headers we don't want here
-    let url = "https://barttorvik.com/getadvstats.php?year=2025&csv=1";
-
-    info!("Fetching data from: {}", url);
-
-    // Fetch the CSV data as text using the blocking client
-    let csv_data = reqwest::get(url).await?.text().await?;
-
-    info!("Data fetched successfully. Parsing CSV...");
-
-    // Define the headers manually in the correct order, using snake_case names.
-    // These MUST match the order of columns in the CSV data and the struct field names above.
-    let headers = StringRecord::from(vec![
-        "player_name", "team", "conf", "gp", "min_per", "o_rtg", "usg", "e_fg", "ts_per",
-        "orb_per", "drb_per", "ast_per", "to_per", "ftm", "fta", "ft_per", "two_pm", "two_pa",
-        "two_p_per", "tpm", "tpa", "tp_per", "blk_per", "stl_per", "ftr", "yr", "ht", "num",
-        "porpag", "adjoe", "pfr", "year", "pid", "player_type", // Use the renamed field 'player_type'
-        "rec_rank", "ast_tov", "rim_made", "rim_attempted", "mid_made", "mid_attempted",
-        "rim_pct", "mid_pct", "dunks_made", "dunks_attempted", "dunk_pct", "pick", "drtg",
-        "adrtg", "dporpag", "stops", "bpm", "obpm", "dbpm", "gbpm", "mp", "ogbpm", "dgbpm",
-        "oreb", "dreb", "treb", "ast", "stl", "blk", "pts"
-    ]);
-
-    // Create a CSV reader builder and configure it
-    let mut reader_builder = ReaderBuilder::new();
-    reader_builder
-        .has_headers(false) // Set to false as the data does not contain headers
-        .trim(csv::Trim::All); // Trim whitespace from fields
-
-    // Build the reader from the CSV data bytes
-    // Need to specify the type for the reader, e.g., Reader<&[u8]>
-    let mut reader: Reader<&[u8]> = reader_builder.from_reader(csv_data.as_bytes());
-
-    // Set the headers on the reader instance *after* it's created
-    reader.set_headers(headers);
-
-    // --- Deserialize into your struct ---
-    info!("Deserializing rows into PlayerStats struct using snake_case headers:");
-
-    // Initialize an empty vector to store the PlayerStats records
-    let mut players: Vec<PlayerStats> = Vec::new();
-    let mut error_count = 0;
-
-    // Now deserialize using the reader with the headers set
-    for result in reader.deserialize::<PlayerStats>() {
-        match result {
-            Ok(record) => {
-                // Push the successfully deserialized record into the vector
-                players.push(record);
-            }
-            Err(e) => {
-                error_count += 1;
-                if error_count <= 5 {
-                    error!("Error deserializing row: {}", e);
-                } else if error_count == 6 {
-                    error!("... (further deserialization errors suppressed)");
-                }
-            }
-        }
-    }
-
-    info!("CSV processing finished.");
-    info!("Successfully parsed and collected {} player records.", players.len()); // Use players.len()
-    if error_count > 0 {
-        info!("Encountered {} errors during deserialization.", error_count);
-    }
-
-    // Optional: Print details of the first few collected players
-    if !players.is_empty() {
-        info!("\nFirst few players collected:");
-        for (i, player) in players.iter().enumerate().take(5) { // Iterate over the collected players
-            info!(
-                "{}. Player: {}, Team: {}, Pts: {:.1?}, Reb: {:.1?}, Ast: {:.1?}",
-                i + 1,
-                player.player_name,
-                player.team,
-                player.pts.unwrap(),
-                player.treb.unwrap(),
-                player.ast.unwrap(),
-            );
-        }
-        if players.len() > 5 {
-            info!("... (and {} more)", players.len() - 5);
-        }
-    } else {
-        info!("\nNo players were collected.");
-    }
-
-    // TODO: learn why we use &players here
-    // the error was "Value used after being moved"
-    for player in &players {
-        if player.player_name == "Cooper Flagg" {
-            info!("{}", player.usg.unwrap());
-        }
-    }
-
-    Ok(players)
-}
-
-pub async fn insert_player_stats(
-    session: &Session,
-    players: &[PlayerStats],
-) -> Result<(), scylla::transport::errors::QueryError> {
-    let query = r#"
-    INSERT INTO stats.player_stats (
-        player_name, team, conf, gp, min_per, o_rtg, usg, e_fg, ts_per, orb_per,
-        drb_per, ast_per, to_per, ftm, fta, ft_per, two_pm, two_pa, two_p_per,
-        tpm, tpa, tp_per, blk_per, stl_per, ftr, yr, ht, num, porpag, adjoe, pfr,
-        year, pid, player_type, rec_rank, ast_tov, rim_made, rim_attempted,
-        mid_made, mid_attempted, rim_pct, mid_pct, dunks_made, dunks_attempted,
-        dunk_pct, pick, drtg, adrtg, dporpag, stops, bpm, obpm, dbpm, gbpm, mp,
-        ogbpm, dgbpm, oreb, dreb, treb, ast, stl, blk, pts
-    ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-    )
-"#;
-
-    let prepared = session.prepare(query).await?;
-    for p in players {
-        session.execute(&prepared, &p).await?;
-    }
-
-    Ok(())
-}
 
 #[get("/api/hello")]
 async fn hello() -> impl Responder {
@@ -281,7 +22,7 @@ async fn hello() -> impl Responder {
 }
 
 #[get("/api/players")]
-async fn get_players(
+async fn get_players_endpoint(
     db: web::Data<Session>,
     query: web::Query<std::collections::HashMap<String, String>>,
 ) -> impl Responder {
@@ -298,43 +39,17 @@ async fn get_players(
         None => return HttpResponse::BadRequest().body("Missing 'year' query param"),
     };
 
-    let query = r#"
-    SELECT player_name, team, conf, gp, min_per, o_rtg, usg, e_fg, ts_per, orb_per,
-           drb_per, ast_per, to_per, ftm, fta, ft_per, two_pm, two_pa, two_p_per,
-           tpm, tpa, tp_per, blk_per, stl_per, ftr, yr, ht, num, porpag, adjoe, pfr,
-           year, pid, player_type, rec_rank, ast_tov, rim_made, rim_attempted,
-           mid_made, mid_attempted, rim_pct, mid_pct, dunks_made, dunks_attempted,
-           dunk_pct, pick, drtg, adrtg, dporpag, stops, bpm, obpm, dbpm, gbpm, mp,
-           ogbpm, dgbpm, oreb, dreb, treb, ast, stl, blk, pts
-    FROM stats.player_stats WHERE team = ? AND year = ?
-"#.to_string();
-    let statement = match db.prepare(query).await {
-        Ok(stmt) => stmt,
-        Err(e) => return HttpResponse::InternalServerError().body(format!("Failed to prepare: {e}")),
-    };
+    let result = get_players_from_db(&db, team_code, year).await;
 
-    let result = db.execute(&statement, (team_code.as_str(), year)).await;
-
-    let rows = match result {
-        Ok(res) => res.rows.unwrap_or_default(),
+    let mut players = match result {
+        Ok(p) => p,
         Err(e) => {
-            error!("Failed to query Scylla: {e}");
+            error!("Failed to query Scylla for players: {e}");
             return HttpResponse::InternalServerError().body(format!("Query failed: {e}"));
         }
     };
 
-    info!("Returned {} rows for team {}", rows.len(), team_code.as_str());
-
-    let mut players: Vec<PlayerStats> = Vec::new();
-
-    for (i, row) in rows.into_iter().enumerate() {
-        match PlayerStats::from_row(row) {
-            Ok(player) => players.push(player),
-            Err(e) => {
-                error!("Row {} failed to convert: {}", i, e);
-            }
-        }
-    }
+    info!("Returned {} rows for team {}", players.len(), team_code);
 
     players.sort_by(|a, b| {
         b.mp.partial_cmp(&a.mp).unwrap_or(std::cmp::Ordering::Equal)
@@ -347,7 +62,7 @@ async fn get_players(
 async fn get_team_stats_endpoint(
     db: web::Data<Session>,
 ) -> impl Responder {
-    let query = r#"
+    let query_cql = r#"
         SELECT rank, team, conf, record, adjoe, adjoe_rank, adjde, adjde_rank, barthag, barthag_rank,
                proj_wins, proj_losses, proj_conf_wins, proj_conf_losses, conf_record,
                sos, nconf_sos, conf_sos, proj_sos, proj_nconf_sos, proj_conf_sos,
@@ -358,7 +73,7 @@ async fn get_team_stats_endpoint(
         FROM stats.team_stats
     "#;
 
-    let prepared = match db.prepare(query).await {
+    let prepared = match db.prepare(query_cql).await {
         Ok(stmt) => stmt,
         Err(e) => {
             error!("Failed to prepare query: {}", e);
@@ -378,7 +93,7 @@ async fn get_team_stats_endpoint(
 
     let mut stats = Vec::new();
     for (i, row) in rows.into_iter().enumerate() {
-        match get_team_stats::TeamStats::from_row(row) {
+        match TeamStats::from_row(row) {
             Ok(stat) => stats.push(stat),
             Err(e) => error!("Failed to parse row {}: {}", i, e),
         }
@@ -389,9 +104,9 @@ async fn get_team_stats_endpoint(
     HttpResponse::Ok().json(stats)
 }
 
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-
     env_logger::init();
     init_db().await.expect("DB setup failed");
 
@@ -399,15 +114,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     info!("🚀 Server running at http://localhost:8000");
 
-    let mut players: Vec<PlayerStats> = get_data().await?;
-
+    let players: Vec<PlayerStats> = get_player_data().await?;
     info!("Players collected: {}", players.len());
-
     insert_player_stats(&db, &players).await?;
 
-    // query_specific_player(scylla_db, "Duke", "Cooper Flagg").await;
-
-    get_team_stats().await.expect("Failed to get Torvik team data");
+    query_specific_player(&db, "Duke", "Cooper Flagg", 2025).await?;
 
     let team_stats = get_team_stats().await?;
     info!("Inserting {} team stats into ScyllaDB", team_stats.len());
@@ -418,9 +129,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     HttpServer::new(move || {
         App::new()
             .app_data(db_data.clone())
-            .service(get_players)
+            .service(get_players_endpoint)
             .service(get_team_stats_endpoint)
-            .service(hello) // keep your old hello handler too
+            .service(hello)
     })
         .bind(("0.0.0.0", 8000))?
         .run()
