@@ -1,10 +1,13 @@
 use std::collections::HashMap;
 use log::{info, error};
 use scylla::Session;
-// Removed: use scyyla::transport::errors::QueryError; // No longer directly used here
+use scylla::query::Query;
+use futures_util::stream::StreamExt;
+use std::time::Duration;
+use scylla::FromRow;
 
 use crate::get_game_stats::GameStats;
-use crate::analytics_types::PlayerSeasonAverages;
+use crate::analytics_types::{PlayerSeasonAverages, PlayerSeasonPercentiles};
 
 /// Calculates and inserts player season average statistics into ScyllaDB.
 /// This function groups game stats by player and year, computes averages,
@@ -208,6 +211,297 @@ pub async fn calculate_and_insert_season_averages(
 
     for avg in season_averages {
         session.execute(&prepared, &avg).await?;
+    }
+
+    Ok(())
+}
+
+/// Fetches all player season average statistics from ScyllaDB.
+pub async fn get_all_player_season_averages_from_db(
+    session: &Session,
+) -> Result<Vec<PlayerSeasonAverages>, Box<dyn std::error::Error>> {
+    info!("Fetching all player season averages from database...");
+    let query_cql = r#"
+        SELECT pid, year, team, player_name, games_played, avg_min_per, avg_o_rtg, avg_usg, avg_e_fg, avg_ts_per, avg_orb_per, avg_drb_per, avg_ast_per, avg_to_per, avg_dunks_made, avg_dunks_att, avg_rim_made, avg_rim_att, avg_mid_made, avg_mid_att, avg_two_pm, avg_two_pa, avg_tpm, avg_tpa, avg_ftm, avg_fta, avg_bpm_rd, avg_obpm, avg_dbpm, avg_bpm_net, avg_pts, avg_orb, avg_drb, avg_ast, avg_tov, avg_stl, avg_blk, avg_stl_per, avg_blk_per, avg_pf, avg_possessions, avg_bpm, avg_sbpm, avg_inches, avg_opstyle, avg_quality, avg_win1, avg_win2
+        FROM stats.player_season_avg_stats
+    "#;
+
+    let mut all_averages = Vec::new();
+    let page_size: i32 = 5000;
+
+    let mut query = Query::new(query_cql);
+    query.set_page_size(page_size);
+    query.set_request_timeout(Some(Duration::from_secs(60)));
+
+    let mut rows_iter = session.query_iter(query, ()).await?;
+
+    let mut row_count = 0;
+    while let Some(row_res) = rows_iter.next().await {
+        match row_res {
+            Ok(row) => {
+                match PlayerSeasonAverages::from_row(row) {
+                    Ok(avg) => {
+                        all_averages.push(avg);
+                        row_count += 1;
+                    },
+                    Err(e) => {
+                        error!("Failed to parse player season average row (total processed: {}): {}", row_count, e);
+                    }
+                }
+            },
+            Err(e) => {
+                error!("Failed to retrieve row from query_iter (total processed: {}): {}", row_count, e);
+                return Err(Box::new(e));
+            }
+        }
+    }
+
+    info!("Successfully fetched and parsed a total of {} player season average records.", all_averages.len());
+    Ok(all_averages)
+}
+
+/// Calculates percentile rank for a given value within a sorted list of values.
+/// Returns a value between 0.0 and 100.0.
+fn calculate_percentile(value: f64, sorted_data: &[f64]) -> f64 {
+    if sorted_data.is_empty() {
+        return 0.0;
+    }
+
+    let n = sorted_data.len() as f64;
+    let mut count_less = 0.0;
+    let mut count_equal = 0.0;
+
+    for &data_point in sorted_data {
+        if data_point < value {
+            count_less += 1.0;
+        } else if data_point == value {
+            count_equal += 1.0;
+        }
+    }
+
+    // Standard formula for percentile rank
+    // P = (Number of values below X + 0.5 * Number of values equal to X) / Total number of values * 100
+    ((count_less + 0.5 * count_equal) / n) * 100.0
+}
+
+
+/// Calculates and inserts player season percentile statistics into ScyllaDB.
+pub async fn calculate_and_insert_season_percentiles(
+    session: &Session,
+    all_season_averages: &[PlayerSeasonAverages],
+) -> Result<(), Box<dyn std::error::Error>> {
+    info!("Calculating player season percentiles...");
+
+    if all_season_averages.is_empty() {
+        info!("No player season averages found to calculate percentiles. Skipping.");
+        return Ok(());
+    }
+
+    // Collect all values for each statistical category
+    let mut min_per_values = Vec::new();
+    let mut o_rtg_values = Vec::new();
+    let mut usg_values = Vec::new();
+    let mut e_fg_values = Vec::new();
+    let mut ts_per_values = Vec::new();
+    let mut orb_per_values = Vec::new();
+    let mut drb_per_values = Vec::new();
+    let mut ast_per_values = Vec::new();
+    let mut to_per_values = Vec::new();
+    let mut dunks_made_values = Vec::new();
+    let mut dunks_att_values = Vec::new();
+    let mut rim_made_values = Vec::new();
+    let mut rim_att_values = Vec::new();
+    let mut mid_made_values = Vec::new();
+    let mut mid_att_values = Vec::new();
+    let mut two_pm_values = Vec::new();
+    let mut two_pa_values = Vec::new();
+    let mut tpm_values = Vec::new();
+    let mut tpa_values = Vec::new();
+    let mut ftm_values = Vec::new();
+    let mut fta_values = Vec::new();
+    let mut bpm_rd_values = Vec::new();
+    let mut obpm_values = Vec::new();
+    let mut dbpm_values = Vec::new();
+    let mut bpm_net_values = Vec::new();
+    let mut pts_values = Vec::new();
+    let mut orb_values = Vec::new();
+    let mut drb_values = Vec::new();
+    let mut ast_values = Vec::new();
+    let mut tov_values = Vec::new();
+    let mut stl_values = Vec::new();
+    let mut blk_values = Vec::new();
+    let mut stl_per_values = Vec::new();
+    let mut blk_per_values = Vec::new();
+    let mut pf_values = Vec::new();
+    let mut possessions_values = Vec::new();
+    let mut bpm_values = Vec::new();
+    let mut sbpm_values = Vec::new();
+    let mut inches_values = Vec::new();
+    let mut opstyle_values = Vec::new();
+    let mut quality_values = Vec::new();
+    let mut win1_values = Vec::new();
+    let mut win2_values = Vec::new();
+
+
+    for avg in all_season_averages.iter() {
+        min_per_values.push(avg.avg_min_per);
+        o_rtg_values.push(avg.avg_o_rtg);
+        usg_values.push(avg.avg_usg);
+        e_fg_values.push(avg.avg_e_fg);
+        ts_per_values.push(avg.avg_ts_per);
+        orb_per_values.push(avg.avg_orb_per);
+        drb_per_values.push(avg.avg_drb_per);
+        ast_per_values.push(avg.avg_ast_per);
+        to_per_values.push(avg.avg_to_per);
+        dunks_made_values.push(avg.avg_dunks_made);
+        dunks_att_values.push(avg.avg_dunks_att);
+        rim_made_values.push(avg.avg_rim_made);
+        rim_att_values.push(avg.avg_rim_att);
+        mid_made_values.push(avg.avg_mid_made);
+        mid_att_values.push(avg.avg_mid_att);
+        two_pm_values.push(avg.avg_two_pm);
+        two_pa_values.push(avg.avg_two_pa);
+        tpm_values.push(avg.avg_tpm);
+        tpa_values.push(avg.avg_tpa);
+        ftm_values.push(avg.avg_ftm);
+        fta_values.push(avg.avg_fta);
+        bpm_rd_values.push(avg.avg_bpm_rd);
+        obpm_values.push(avg.avg_obpm);
+        dbpm_values.push(avg.avg_dbpm);
+        bpm_net_values.push(avg.avg_bpm_net);
+        pts_values.push(avg.avg_pts);
+        orb_values.push(avg.avg_orb);
+        drb_values.push(avg.avg_drb);
+        ast_values.push(avg.avg_ast);
+        tov_values.push(avg.avg_tov);
+        stl_values.push(avg.avg_stl);
+        blk_values.push(avg.avg_blk);
+        stl_per_values.push(avg.avg_stl_per);
+        blk_per_values.push(avg.avg_blk_per);
+        pf_values.push(avg.avg_pf);
+        possessions_values.push(avg.avg_possessions);
+        bpm_values.push(avg.avg_bpm);
+        sbpm_values.push(avg.avg_sbpm);
+        inches_values.push(avg.avg_inches);
+        opstyle_values.push(avg.avg_opstyle);
+        quality_values.push(avg.avg_quality);
+        win1_values.push(avg.avg_win1);
+        win2_values.push(avg.avg_win2);
+    }
+
+    // Sort all collected values for percentile calculation
+    min_per_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    o_rtg_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    usg_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    e_fg_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    ts_per_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    orb_per_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    drb_per_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    ast_per_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    to_per_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    dunks_made_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    dunks_att_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    rim_made_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    rim_att_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    mid_made_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    mid_att_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    two_pm_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    two_pa_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    tpm_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    tpa_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    ftm_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    fta_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    bpm_rd_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    obpm_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    dbpm_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    bpm_net_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    pts_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    orb_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    drb_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    ast_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    tov_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    stl_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    blk_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    stl_per_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    blk_per_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    pf_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    possessions_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    bpm_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    sbpm_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    inches_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    opstyle_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    quality_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    win1_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    win2_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+
+    let mut season_percentiles: Vec<PlayerSeasonPercentiles> = Vec::new();
+
+    for avg in all_season_averages.iter() {
+        season_percentiles.push(PlayerSeasonPercentiles {
+            pid: avg.pid,
+            year: avg.year,
+            team: avg.team.clone(),
+            player_name: avg.player_name.clone(),
+            pct_min_per: calculate_percentile(avg.avg_min_per, &min_per_values),
+            pct_o_rtg: calculate_percentile(avg.avg_o_rtg, &o_rtg_values),
+            pct_usg: calculate_percentile(avg.avg_usg, &usg_values),
+            pct_e_fg: calculate_percentile(avg.avg_e_fg, &e_fg_values),
+            pct_ts_per: calculate_percentile(avg.avg_ts_per, &ts_per_values),
+            pct_orb_per: calculate_percentile(avg.avg_orb_per, &orb_per_values),
+            pct_drb_per: calculate_percentile(avg.avg_drb_per, &drb_per_values),
+            pct_ast_per: calculate_percentile(avg.avg_ast_per, &ast_per_values),
+            pct_to_per: calculate_percentile(avg.avg_to_per, &to_per_values),
+            pct_dunks_made: calculate_percentile(avg.avg_dunks_made, &dunks_made_values),
+            pct_dunks_att: calculate_percentile(avg.avg_dunks_att, &dunks_att_values),
+            pct_rim_made: calculate_percentile(avg.avg_rim_made, &rim_made_values),
+            pct_rim_att: calculate_percentile(avg.avg_rim_att, &rim_att_values),
+            pct_mid_made: calculate_percentile(avg.avg_mid_made, &mid_made_values),
+            pct_mid_att: calculate_percentile(avg.avg_mid_att, &mid_att_values),
+            pct_two_pm: calculate_percentile(avg.avg_two_pm, &two_pm_values),
+            pct_two_pa: calculate_percentile(avg.avg_two_pa, &two_pa_values),
+            pct_tpm: calculate_percentile(avg.avg_tpm, &tpm_values),
+            pct_tpa: calculate_percentile(avg.avg_tpa, &tpa_values),
+            pct_ftm: calculate_percentile(avg.avg_ftm, &ftm_values),
+            pct_fta: calculate_percentile(avg.avg_fta, &fta_values),
+            pct_bpm_rd: calculate_percentile(avg.avg_bpm_rd, &bpm_rd_values),
+            pct_obpm: calculate_percentile(avg.avg_obpm, &obpm_values),
+            pct_dbpm: calculate_percentile(avg.avg_dbpm, &dbpm_values),
+            pct_bpm_net: calculate_percentile(avg.avg_bpm_net, &bpm_net_values),
+            pct_pts: calculate_percentile(avg.avg_pts, &pts_values),
+            pct_orb: calculate_percentile(avg.avg_orb, &orb_values),
+            pct_drb: calculate_percentile(avg.avg_drb, &drb_values),
+            pct_ast: calculate_percentile(avg.avg_ast, &ast_values),
+            pct_tov: calculate_percentile(avg.avg_tov, &tov_values),
+            pct_stl: calculate_percentile(avg.avg_stl, &stl_values),
+            pct_blk: calculate_percentile(avg.avg_blk, &blk_values),
+            pct_stl_per: calculate_percentile(avg.avg_stl_per, &stl_per_values),
+            pct_blk_per: calculate_percentile(avg.avg_blk_per, &blk_per_values),
+            pct_pf: calculate_percentile(avg.avg_pf, &pf_values),
+            pct_possessions: calculate_percentile(avg.avg_possessions, &possessions_values),
+            pct_bpm: calculate_percentile(avg.avg_bpm, &bpm_values),
+            pct_sbpm: calculate_percentile(avg.avg_sbpm, &sbpm_values),
+            pct_inches: calculate_percentile(avg.avg_inches, &inches_values),
+            pct_opstyle: calculate_percentile(avg.avg_opstyle, &opstyle_values),
+            pct_quality: calculate_percentile(avg.avg_quality, &quality_values),
+            pct_win1: calculate_percentile(avg.avg_win1, &win1_values),
+            pct_win2: calculate_percentile(avg.avg_win2, &win2_values),
+        });
+    }
+
+    info!("Inserting {} player season percentile records into ScyllaDB", season_percentiles.len());
+    let query = r#"
+        INSERT INTO stats.player_season_percentiles (
+            pid, year, team, player_name, pct_min_per, pct_o_rtg, pct_usg, pct_e_fg, pct_ts_per, pct_orb_per, pct_drb_per, pct_ast_per, pct_to_per, pct_dunks_made, pct_dunks_att, pct_rim_made, pct_rim_att, pct_mid_made, pct_mid_att, pct_two_pm, pct_two_pa, pct_tpm, pct_tpa, pct_ftm, pct_fta, pct_bpm_rd, pct_obpm, pct_dbpm, pct_bpm_net, pct_pts, pct_orb, pct_drb, pct_ast, pct_tov, pct_stl, pct_blk, pct_stl_per, pct_blk_per, pct_pf, pct_possessions, pct_bpm, pct_sbpm, pct_inches, pct_opstyle, pct_quality, pct_win1, pct_win2
+        ) VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        )
+    "#;
+
+    let prepared = session.prepare(query).await?;
+
+    for pct in season_percentiles {
+        session.execute(&prepared, &pct).await?;
     }
 
     Ok(())
