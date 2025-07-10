@@ -17,8 +17,11 @@ use crate::get_player_stats::{get_player_data, insert_player_stats, PlayerStats}
 use crate::init_db::init_db;
 use crate::db_utils::{connect_to_scylla, query_specific_player, get_players_from_db};
 use crate::get_game_stats::{get_game_data, insert_game_stats, GameStats, get_all_game_stats_from_db};
-use crate::analytics_calculator::{calculate_and_insert_season_averages};//, calculate_and_insert_season_percentiles, get_all_player_season_averages_from_db};
-
+use crate::analytics_calculator::{
+    calculate_and_insert_season_averages,
+    calculate_and_insert_season_percentiles,
+    get_all_player_season_averages_from_db}
+;
 
 #[get("/api/hello")]
 async fn hello() -> impl Responder {
@@ -220,8 +223,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Calculate and insert player season percentiles
     info!("Starting player season percentile calculation...");
     // Fetch averages for percentile calculation
-    // let all_season_averages = get_all_player_season_averages_from_db(&db).await?;
-    // calculate_and_insert_season_percentiles(&db, &all_season_averages).await?;
+    let all_season_averages = get_all_player_season_averages_from_db(&db).await?; // Uncommented
+    calculate_and_insert_season_percentiles(&db, &all_season_averages).await?; // Uncommented
     info!("Finished player season percentile calculation.");
 
 
