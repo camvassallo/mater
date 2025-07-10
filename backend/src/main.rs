@@ -223,8 +223,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Calculate and insert player season percentiles
     info!("Starting player season percentile calculation...");
     // Fetch averages for percentile calculation
-    let all_season_averages = get_all_player_season_averages_from_db(&db).await?; // Uncommented
-    calculate_and_insert_season_percentiles(&db, &all_season_averages).await?; // Uncommented
+    let all_season_averages = get_all_player_season_averages_from_db(&db).await?;
+    calculate_and_insert_season_percentiles(&db, &all_season_averages).await?;
     info!("Finished player season percentile calculation.");
 
 
