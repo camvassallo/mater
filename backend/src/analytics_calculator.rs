@@ -45,98 +45,105 @@ pub async fn calculate_and_insert_season_averages(
             continue; // Should not happen if entry exists, but good safeguard
         }
 
+        // Sums for calculating overall percentages/ratios
+        let mut total_dunks_made = 0.0;
+        let mut total_dunks_att = 0.0;
+        let mut total_rim_made = 0.0;
+        let mut total_rim_att = 0.0;
+        let mut total_mid_made = 0.0;
+        let mut total_mid_att = 0.0;
+        let mut total_two_pm = 0.0;
+        let mut total_two_pa = 0.0;
+        let mut total_tpm = 0.0;
+        let mut total_tpa = 0.0;
+        let mut total_ftm = 0.0;
+        let mut total_fta = 0.0;
+        let mut total_pts = 0.0;
+        let mut total_orb = 0.0;
+        let mut total_drb = 0.0;
+        let mut total_ast = 0.0;
+        let mut total_tov = 0.0;
+        let mut total_stl = 0.0;
+        let mut total_blk = 0.0;
+        let mut total_pf = 0.0;
+        let mut total_possessions = 0.0;
+        let mut total_inches = 0.0;
+        let mut total_opstyle = 0.0;
+        let mut total_quality = 0.0;
+        let mut total_win1 = 0.0;
+        let mut total_win2 = 0.0;
+
+        // Sums for simple averages of already calculated per-game percentages/rates or complex stats
         let mut sum_min_per = 0.0;
         let mut sum_o_rtg = 0.0;
         let mut sum_usg = 0.0;
-        let mut sum_e_fg = 0.0;
-        let mut sum_ts_per = 0.0;
-        let mut sum_orb_per = 0.0;
-        let mut sum_drb_per = 0.0;
-        let mut sum_ast_per = 0.0;
-        let mut sum_to_per = 0.0;
-        let mut sum_dunks_made = 0.0;
-        let mut sum_dunks_att = 0.0;
-        let mut sum_rim_made = 0.0;
-        let mut sum_rim_att = 0.0;
-        let mut sum_mid_made = 0.0;
-        let mut sum_mid_att = 0.0;
-        let mut sum_two_pm = 0.0;
-        let mut sum_two_pa = 0.0;
-        let mut sum_tpm = 0.0;
-        let mut sum_tpa = 0.0;
-        let mut sum_ftm = 0.0;
-        let mut sum_fta = 0.0;
         let mut sum_bpm_rd = 0.0;
         let mut sum_obpm = 0.0;
         let mut sum_dbpm = 0.0;
         let mut sum_bpm_net = 0.0;
-        let mut sum_pts = 0.0;
-        let mut sum_orb = 0.0;
-        let mut sum_drb = 0.0;
-        let mut sum_ast = 0.0;
-        let mut sum_tov = 0.0;
-        let mut sum_stl = 0.0;
-        let mut sum_blk = 0.0;
-        let mut sum_stl_per = 0.0;
-        let mut sum_blk_per = 0.0;
-        let mut sum_pf = 0.0;
-        let mut sum_possessions = 0.0;
         let mut sum_bpm = 0.0;
         let mut sum_sbpm = 0.0;
-        let mut sum_inches = 0.0;
-        let mut sum_opstyle = 0.0;
-        let mut sum_quality = 0.0;
-        let mut sum_win1 = 0.0;
-        let mut sum_win2 = 0.0;
+        let mut sum_e_fg_per_game = 0.0; // To keep track of average of per-game EFG if needed for comparison
+        let mut sum_ts_per_per_game = 0.0; // To keep track of average of per-game TS% if needed for comparison
+        let mut sum_orb_per_per_game = 0.0;
+        let mut sum_drb_per_per_game = 0.0;
+        let mut sum_ast_per_per_game = 0.0;
+        let mut sum_to_per_per_game = 0.0;
+        let mut sum_stl_per_per_game = 0.0;
+        let mut sum_blk_per_per_game = 0.0;
+
 
         let mut player_name = "Unknown".to_string(); // Default, will be updated
 
         for game in games {
-            // Use unwrap_or_default() for Option<f64> and Option<i32> fields
-            // For integer-like fields, cast to f64 for summation
+            // Raw totals (numerator/denominator for percentages)
+            total_dunks_made += game.dunks_made.unwrap_or_default() as f64;
+            total_dunks_att += game.dunks_att.unwrap_or_default() as f64;
+            total_rim_made += game.rim_made.unwrap_or_default() as f64;
+            total_rim_att += game.rim_att.unwrap_or_default() as f64;
+            total_mid_made += game.mid_made.unwrap_or_default() as f64;
+            total_mid_att += game.mid_att.unwrap_or_default() as f64;
+            total_two_pm += game.two_pm.unwrap_or_default() as f64;
+            total_two_pa += game.two_pa.unwrap_or_default() as f64;
+            total_tpm += game.tpm.unwrap_or_default() as f64;
+            total_tpa += game.tpa.unwrap_or_default() as f64;
+            total_ftm += game.ftm.unwrap_or_default() as f64;
+            total_fta += game.fta.unwrap_or_default() as f64;
+            total_pts += game.pts.unwrap_or_default();
+            total_orb += game.orb.unwrap_or_default();
+            total_drb += game.drb.unwrap_or_default();
+            total_ast += game.ast.unwrap_or_default();
+            total_tov += game.tov.unwrap_or_default();
+            total_stl += game.stl.unwrap_or_default();
+            total_blk += game.blk.unwrap_or_default();
+            total_pf += game.pf.unwrap_or_default();
+            total_possessions += game.possessions.unwrap_or_default();
+            total_inches += game.inches.unwrap_or_default() as f64;
+            total_opstyle += game.opstyle.unwrap_or_default() as f64;
+            total_quality += game.quality.unwrap_or_default() as f64;
+            total_win1 += game.win1.unwrap_or_default() as f64;
+            total_win2 += game.win2.unwrap_or_default() as f64;
+
+
+            // Sum per-game values for stats that are already percentages or complex rates
             sum_min_per += game.min_per.unwrap_or_default();
             sum_o_rtg += game.o_rtg.unwrap_or_default();
             sum_usg += game.usage.unwrap_or_default();
-            sum_e_fg += game.e_fg.unwrap_or_default();
-            sum_ts_per += game.ts_per.unwrap_or_default();
-            sum_orb_per += game.orb_per.unwrap_or_default();
-            sum_drb_per += game.drb_per.unwrap_or_default();
-            sum_ast_per += game.ast_per.unwrap_or_default();
-            sum_to_per += game.to_per.unwrap_or_default();
-            sum_dunks_made += game.dunks_made.unwrap_or_default() as f64;
-            sum_dunks_att += game.dunks_att.unwrap_or_default() as f64;
-            sum_rim_made += game.rim_made.unwrap_or_default() as f64;
-            sum_rim_att += game.rim_att.unwrap_or_default() as f64;
-            sum_mid_made += game.mid_made.unwrap_or_default() as f64;
-            sum_mid_att += game.mid_att.unwrap_or_default() as f64;
-            sum_two_pm += game.two_pm.unwrap_or_default() as f64;
-            sum_two_pa += game.two_pa.unwrap_or_default() as f64;
-            sum_tpm += game.tpm.unwrap_or_default() as f64;
-            sum_tpa += game.tpa.unwrap_or_default() as f64;
-            sum_ftm += game.ftm.unwrap_or_default() as f64;
-            sum_fta += game.fta.unwrap_or_default() as f64;
             sum_bpm_rd += game.bpm_rd.unwrap_or_default();
             sum_obpm += game.obpm.unwrap_or_default();
             sum_dbpm += game.dbpm.unwrap_or_default();
             sum_bpm_net += game.bpm_net.unwrap_or_default();
-            sum_pts += game.pts.unwrap_or_default();
-            sum_orb += game.orb.unwrap_or_default();
-            sum_drb += game.drb.unwrap_or_default();
-            sum_ast += game.ast.unwrap_or_default();
-            sum_tov += game.tov.unwrap_or_default();
-            sum_stl += game.stl.unwrap_or_default();
-            sum_blk += game.blk.unwrap_or_default();
-            sum_stl_per += game.stl_per.unwrap_or_default();
-            sum_blk_per += game.blk_per.unwrap_or_default();
-            sum_pf += game.pf.unwrap_or_default();
-            sum_possessions += game.possessions.unwrap_or_default();
             sum_bpm += game.bpm.unwrap_or_default();
             sum_sbpm += game.sbpm.unwrap_or_default();
-            sum_inches += game.inches.unwrap_or_default() as f64;
-            sum_opstyle += game.opstyle.unwrap_or_default() as f64;
-            sum_quality += game.quality.unwrap_or_default() as f64;
-            sum_win1 += game.win1.unwrap_or_default() as f64;
-            sum_win2 += game.win2.unwrap_or_default() as f64;
+            sum_e_fg_per_game += game.e_fg.unwrap_or_default(); // Store for potential comparison
+            sum_ts_per_per_game += game.ts_per.unwrap_or_default(); // Store for potential comparison
+            sum_orb_per_per_game += game.orb_per.unwrap_or_default();
+            sum_drb_per_per_game += game.drb_per.unwrap_or_default();
+            sum_ast_per_per_game += game.ast_per.unwrap_or_default();
+            sum_to_per_per_game += game.to_per.unwrap_or_default();
+            sum_stl_per_per_game += game.stl_per.unwrap_or_default();
+            sum_blk_per_per_game += game.blk_per.unwrap_or_default();
+
 
             // Update player name (should be consistent across games for a player/team/season)
             if !game.pp.is_empty() {
@@ -146,55 +153,84 @@ pub async fn calculate_and_insert_season_averages(
 
         let avg_games_played = games_played as f64;
 
+        // Calculate true season-long percentages
+        let avg_e_fg = if (total_two_pa + total_tpa) > 0.0 {
+            (total_two_pm + 0.5 * total_tpm) / (total_two_pa + total_tpa)
+        } else { 0.0 };
+
+        let avg_ts_per = if (total_tpa + 0.44 * total_fta) > 0.0 {
+            total_pts / (2.0 * (total_tpa + 0.44 * total_fta))
+        } else { 0.0 };
+
+        let avg_ft_per = if total_fta > 0.0 { total_ftm / total_fta } else { 0.0 };
+
+        // For assist/turnover/rebounding/steal/block percentages, these are rates already calculated per game.
+        // It's generally accepted to average these per-game percentages for a season average,
+        // unless you have access to the underlying raw data across the entire league for a more
+        // complex "true" season-long rate calculation which is often not feasible or the standard.
+        // The original fields are `_per` (percentage/rate) already, so simple average is a reasonable approach.
+        let avg_orb_per = sum_orb_per_per_game / avg_games_played;
+        let avg_drb_per = sum_drb_per_per_game / avg_games_played;
+        let avg_ast_per = sum_ast_per_per_game / avg_games_played;
+        let avg_to_per = sum_to_per_per_game / avg_games_played;
+        let avg_stl_per = sum_stl_per_per_game / avg_games_played;
+        let avg_blk_per = sum_blk_per_per_game / avg_games_played;
+
+
         season_averages.push(PlayerSeasonAverages {
             pid,
             year,
             team: team.clone(),
             player_name: player_name.clone(),
             games_played,
+            // Simple averages for per-game values
             avg_min_per: sum_min_per / avg_games_played,
             avg_o_rtg: sum_o_rtg / avg_games_played,
             avg_usg: sum_usg / avg_games_played,
-            avg_e_fg: sum_e_fg / avg_games_played,
-            avg_ts_per: sum_ts_per / avg_games_played,
-            avg_orb_per: sum_orb_per / avg_games_played,
-            avg_drb_per: sum_drb_per / avg_games_played,
-            avg_ast_per: sum_ast_per / avg_games_played,
-            avg_to_per: sum_to_per / avg_games_played,
-            avg_dunks_made: sum_dunks_made / avg_games_played,
-            avg_dunks_att: sum_dunks_att / avg_games_played,
-            avg_rim_made: sum_rim_made / avg_games_played,
-            avg_rim_att: sum_rim_att / avg_games_played,
-            avg_mid_made: sum_mid_made / avg_games_played,
-            avg_mid_att: sum_mid_att / avg_games_played,
-            avg_two_pm: sum_two_pm / avg_games_played,
-            avg_two_pa: sum_two_pa / avg_games_played,
-            avg_tpm: sum_tpm / avg_games_played,
-            avg_tpa: sum_tpa / avg_games_played,
-            avg_ftm: sum_ftm / avg_games_played,
-            avg_fta: sum_fta / avg_games_played,
             avg_bpm_rd: sum_bpm_rd / avg_games_played,
             avg_obpm: sum_obpm / avg_games_played,
             avg_dbpm: sum_dbpm / avg_games_played,
             avg_bpm_net: sum_bpm_net / avg_games_played,
-            avg_pts: sum_pts / avg_games_played,
-            avg_orb: sum_orb / avg_games_played,
-            avg_drb: sum_drb / avg_games_played,
-            avg_ast: sum_ast / avg_games_played,
-            avg_tov: sum_tov / avg_games_played,
-            avg_stl: sum_stl / avg_games_played,
-            avg_blk: sum_blk / avg_games_played,
-            avg_stl_per: sum_stl_per / avg_games_played,
-            avg_blk_per: sum_blk_per / avg_games_played,
-            avg_pf: sum_pf / avg_games_played,
-            avg_possessions: sum_possessions / avg_games_played,
             avg_bpm: sum_bpm / avg_games_played,
             avg_sbpm: sum_sbpm / avg_games_played,
-            avg_inches: sum_inches / avg_games_played,
-            avg_opstyle: sum_opstyle / avg_games_played,
-            avg_quality: sum_quality / avg_games_played,
-            avg_win1: sum_win1 / avg_games_played,
-            avg_win2: sum_win2 / avg_games_played,
+            avg_pf: total_pf / avg_games_played, // Assuming PF is a simple per-game average
+            avg_possessions: total_possessions / avg_games_played, // Assuming Possessions is simple average
+            avg_inches: total_inches / avg_games_played, // Assuming Inches is simple average of per-game values
+            avg_opstyle: total_opstyle / avg_games_played,
+            avg_quality: total_quality / avg_games_played,
+            avg_win1: total_win1 / avg_games_played,
+            avg_win2: total_win2 / avg_games_played,
+
+            // Overall season percentages/rates
+            avg_e_fg,
+            avg_ts_per,
+            avg_orb_per, // These are averaged as per-game percentages
+            avg_drb_per,
+            avg_ast_per,
+            avg_to_per,
+            avg_stl_per,
+            avg_blk_per,
+
+            // Totals / Averages of Counts
+            avg_dunks_made: total_dunks_made / avg_games_played,
+            avg_dunks_att: total_dunks_att / avg_games_played,
+            avg_rim_made: total_rim_made / avg_games_played,
+            avg_rim_att: total_rim_att / avg_games_played,
+            avg_mid_made: total_mid_made / avg_games_played,
+            avg_mid_att: total_mid_att / avg_games_played,
+            avg_two_pm: total_two_pm / avg_games_played,
+            avg_two_pa: total_two_pa / avg_games_played,
+            avg_tpm: total_tpm / avg_games_played,
+            avg_tpa: total_tpa / avg_games_played,
+            avg_ftm: total_ftm / avg_games_played, // This is now total FTM averaged per game
+            avg_fta: total_fta / avg_games_played, // This is now total FTA averaged per game
+            avg_pts: total_pts / avg_games_played,
+            avg_orb: total_orb / avg_games_played,
+            avg_drb: total_drb / avg_games_played,
+            avg_ast: total_ast / avg_games_played,
+            avg_tov: total_tov / avg_games_played,
+            avg_stl: total_stl / avg_games_played,
+            avg_blk: total_blk / avg_games_played,
         });
     }
 
