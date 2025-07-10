@@ -3,11 +3,13 @@ use scylla::SessionBuilder;
 
 pub async fn init_db() -> Result<(), scylla::transport::errors::NewSessionError> {
 
+    // Connect to ScyllaDB
     let session = SessionBuilder::new()
-        .known_node("127.0.0.1:9042")
+        .known_node("127.0.0.1:9042") // or your Docker IP
         .build()
         .await?;
 
+    // Create keyspace
     session
         .query(
             "CREATE KEYSPACE IF NOT EXISTS stats WITH replication = { 'class': 'SimpleStrategy', 'replication_factor': 1 };",
@@ -199,6 +201,121 @@ pub async fn init_db() -> Result<(), scylla::transport::errors::NewSessionError>
                 pid int,
                 year int,
                 PRIMARY KEY ((pid, year, tt), numdate)
+            );",
+            &[],
+        )
+        .await?;
+
+    // Create table for player season average stats
+    session
+        .query(
+            "CREATE TABLE IF NOT EXISTS stats.player_season_avg_stats (
+                pid int,
+                year int,
+                team text,
+                player_name text,
+                games_played int,
+                avg_min_per double,
+                avg_o_rtg double,
+                avg_usg double,
+                avg_e_fg double,
+                avg_ts_per double,
+                avg_orb_per double,
+                avg_drb_per double,
+                avg_ast_per double,
+                avg_to_per double,
+                avg_dunks_made double,
+                avg_dunks_att double,
+                avg_rim_made double,
+                avg_rim_att double,
+                avg_mid_made double,
+                avg_mid_att double,
+                avg_two_pm double,
+                avg_two_pa double,
+                avg_tpm double,
+                avg_tpa double,
+                avg_ftm double,
+                avg_fta double,
+                avg_bpm_rd double,
+                avg_obpm double,
+                avg_dbpm double,
+                avg_bpm_net double,
+                avg_pts double,
+                avg_orb double,
+                avg_drb double,
+                avg_ast double,
+                avg_tov double,
+                avg_stl double,
+                avg_blk double,
+                avg_stl_per double,
+                avg_blk_per double,
+                avg_pf double,
+                avg_possessions double,
+                avg_bpm double,
+                avg_sbpm double,
+                avg_inches double,
+                avg_opstyle double,
+                avg_quality double,
+                avg_win1 double,
+                avg_win2 double,
+                PRIMARY KEY ((pid, year), team)
+            );",
+            &[],
+        )
+        .await?;
+
+    // Create table for player season percentiles
+    session
+        .query(
+            "CREATE TABLE IF NOT EXISTS stats.player_season_percentiles (
+                pid int,
+                year int,
+                team text,
+                player_name text,
+                pct_min_per double,
+                pct_o_rtg double,
+                pct_usg double,
+                pct_e_fg double,
+                pct_ts_per double,
+                pct_orb_per double,
+                pct_drb_per double,
+                pct_ast_per double,
+                pct_to_per double,
+                pct_dunks_made double,
+                pct_dunks_att double,
+                pct_rim_made double,
+                pct_rim_att double,
+                pct_mid_made double,
+                pct_mid_att double,
+                pct_two_pm double,
+                pct_two_pa double,
+                pct_tpm double,
+                pct_tpa double,
+                pct_ftm double,
+                pct_fta double,
+                pct_bpm_rd double,
+                pct_obpm double,
+                pct_dbpm double,
+                pct_bpm_net double,
+                pct_pts double,
+                pct_orb double,
+                pct_drb double,
+                pct_ast double,
+                pct_tov double,
+                pct_stl double,
+                pct_blk double,
+                pct_stl_per double,
+                pct_blk_per double,
+                pct_pf double,
+                pct_possessions double,
+                pct_bpm double,
+                pct_sbpm double,
+                pct_inches double,
+                pct_opstyle double,
+                pct_quality double,
+                pct_win1 double,
+                pct_win2 double,
+                PRIMARY KEY ((pid, year), team)
             );",
             &[],
         )

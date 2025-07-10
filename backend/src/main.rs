@@ -4,18 +4,20 @@ use env_logger;
 use actix_web::{get, web, App, HttpServer, HttpResponse, Responder};
 use scylla::{Session, FromRow};
 
-// module imports
 mod init_db;
 mod get_team_stats;
 mod get_player_stats;
 mod db_utils;
 mod get_game_stats;
+mod analytics_types;
+mod analytics_calculator;
 
 use crate::get_team_stats::{get_team_stats, insert_team_stats, TeamStats};
 use crate::get_player_stats::{get_player_data, insert_player_stats, PlayerStats};
 use crate::init_db::init_db;
 use crate::db_utils::{connect_to_scylla, query_specific_player, get_players_from_db};
-use crate::get_game_stats::{get_game_data, insert_game_stats, GameStats};
+use crate::get_game_stats::{get_game_data, insert_game_stats, GameStats, get_all_game_stats_from_db};
+use crate::analytics_calculator::{calculate_and_insert_season_averages};//, calculate_and_insert_season_percentiles, get_all_player_season_averages_from_db};
 
 
 #[get("/api/hello")]
@@ -182,19 +184,45 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     info!("🚀 Server running at http://localhost:8000");
 
-    let players: Vec<PlayerStats> = get_player_data().await?;
-    info!("Players collected: {}", players.len());
-    insert_player_stats(&db, &players).await?;
+    // Set this to `true` to skip fetching and inserting data for faster testing.
+    // Ensure your ScyllaDB instance already has data if you set this to `true`.
+    const SKIP_DATA_LOADING: bool = true; // Set to `true` to skip data loading
 
-    query_specific_player(&db, "Duke", "Cooper Flagg", 2025).await?;
+    #[allow(unused_assignments)] // Suppress warning about game_stats being assigned but not directly read after assignment
+    let mut game_stats: Vec<GameStats> = Vec::new(); // Declare game_stats mutably outside the if block
 
-    let team_stats = get_team_stats().await?;
-    info!("Inserting {} team stats into ScyllaDB", team_stats.len());
-    insert_team_stats(&db, &team_stats).await?;
+    if !SKIP_DATA_LOADING {
+        let players: Vec<PlayerStats> = get_player_data().await?;
+        info!("Players collected: {}", players.len());
+        insert_player_stats(&db, &players).await?;
 
-    let game_stats = get_game_data().await?;
-    info!("Inserting {} game stats into ScyllaDB", game_stats.len());
-    insert_game_stats(&db, &game_stats).await?;
+        query_specific_player(&db, "Duke", "Cooper Flagg", 2025).await?;
+
+        let team_stats = get_team_stats().await?;
+        info!("Inserting {} team stats into ScyllaDB", team_stats.len());
+        insert_team_stats(&db, &team_stats).await?;
+
+        game_stats = get_game_data().await?; // Assign to the outer game_stats
+        info!("Inserting {} game stats into ScyllaDB", game_stats.len());
+        insert_game_stats(&db, &game_stats).await?;
+    } else {
+        info!("Skipping initial data loading and insertion as SKIP_DATA_LOADING is true.");
+        // Fetch game_stats from DB when skipping initial loading, so analytics can still run.
+        game_stats = get_all_game_stats_from_db(&db).await?;
+    }
+
+
+    // Calculate and insert player season averages
+    info!("Starting player season average calculation...");
+    calculate_and_insert_season_averages(&db, &game_stats).await?;
+    info!("Finished player season average calculation.");
+
+    // Calculate and insert player season percentiles
+    info!("Starting player season percentile calculation...");
+    // Fetch averages for percentile calculation
+    // let all_season_averages = get_all_player_season_averages_from_db(&db).await?;
+    // calculate_and_insert_season_percentiles(&db, &all_season_averages).await?;
+    info!("Finished player season percentile calculation.");
 
 
     let db_data = web::Data::new(db);

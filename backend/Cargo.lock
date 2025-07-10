@@ -1390,6 +1390,7 @@ dependencies = [
  "csv",
  "env_logger",
  "flate2",
+ "futures-util",
  "log",
  "reqwest",
  "scylla",

@@ -1,12 +1,14 @@
 use std::error::Error;
-use log::{info, error}; // Removed 'warn' as its associated macros will be removed
+use log::{info, error};
 use serde::{Deserialize, Serialize};
-use scylla::{FromRow, SerializeRow, Session};
+use scylla::{FromRow, SerializeRow, Session}; // Removed Bytes as it's no longer directly used with query_iter
 use scylla::transport::errors::QueryError;
 use flate2::read::GzDecoder;
 use std::io::Read;
+use std::time::Duration;
+use scylla::query::Query;
+use futures_util::stream::StreamExt; // NEW: Import StreamExt for the .next() method
 
-// Removed unused deserialize_empty_string_as_none_f64 and deserialize_empty_string_as_none_i32 functions.
 
 // Helper function to parse a serde_json::Value into an Option<f64>
 // Handles direct numbers and numeric strings, including empty strings for None.
@@ -51,7 +53,6 @@ fn get_opt_i32(value: &serde_json::Value) -> Result<Option<i32>, Box<dyn Error>>
 pub struct GameStats {
     pub numdate: String,
     pub datetext: String,
-    // ... all other fields in their exact declared order ...
     pub opstyle: Option<i32>,
     pub quality: Option<i32>,
     pub win1: Option<i32>,
@@ -104,8 +105,6 @@ pub struct GameStats {
     pub pid: Option<i32>,
     pub year: Option<i32>,
 }
-
-// Removed "Order of fields in the JSON array" comment block.
 
 impl GameStats {
     pub fn from_json_array(arr: &[serde_json::Value]) -> Result<Self, Box<dyn Error>> {
@@ -175,9 +174,6 @@ impl GameStats {
             pid: get_opt_i32(get_raw_val(51))?,
             year: get_opt_i32(get_raw_val(52))?,
         };
-
-        // Removed debugging warn! logs here.
-
         Ok(game_stats)
     }
 }
@@ -195,7 +191,6 @@ pub async fn get_game_data() -> Result<Vec<GameStats>, Box<dyn Error>> {
 
     info!("Game data decompressed. Parsing JSON...");
 
-    // Deserialize into a Vec of Vec of serde_json::Value
     let raw_data: Vec<Vec<serde_json::Value>> = serde_json::from_str(&decompressed_data)?;
 
     let mut game_stats_records: Vec<GameStats> = Vec::new();
@@ -212,7 +207,7 @@ pub async fn get_game_data() -> Result<Vec<GameStats>, Box<dyn Error>> {
                     error!("Error deserializing game row {}: {:?}", i, e);
                     error!("Problematic row data: {:?}", row);
                 } else if error_count == 6 {
-                    error!("... (further game deserialization errors suppressed)");
+                    error!("... (further deserialization errors suppressed)");
                 }
             }
         }
@@ -221,7 +216,7 @@ pub async fn get_game_data() -> Result<Vec<GameStats>, Box<dyn Error>> {
     info!("Game data processing finished.");
     info!("Successfully parsed and collected {} game records.", game_stats_records.len());
     if error_count > 0 {
-        info!("Encountered {} errors during game deserialization.", error_count);
+        info!("Encountered {} errors during deserialization.", error_count);
     }
 
     if !game_stats_records.is_empty() {
@@ -247,6 +242,57 @@ pub async fn get_game_data() -> Result<Vec<GameStats>, Box<dyn Error>> {
     Ok(game_stats_records)
 }
 
+pub async fn get_all_game_stats_from_db(
+    session: &Session,
+) -> Result<Vec<GameStats>, Box<dyn Error>> {
+    info!("Fetching all game stats from database using query_iter...");
+    let query_cql = r#"
+        SELECT numdate, datetext, opstyle, quality, win1, opponent, muid, win2, min_per, o_rtg, usage,
+               e_fg, ts_per, orb_per, drb_per, ast_per, to_per, dunks_made, dunks_att, rim_made,
+               rim_att, mid_made, mid_att, two_pm, two_pa, tpm, tpa, ftm, fta, bpm_rd, obpm,
+               dbpm, bpm_net, pts, orb, drb, ast, tov, stl, blk, stl_per, blk_per, pf,
+               possessions, bpm, sbpm, loc, tt, pp, inches, cls, pid, year
+        FROM stats.game_stats
+    "#;
+
+    let mut all_game_stats = Vec::new();
+    let page_size: i32 = 5000; // Define a reasonable page size for internal iteration
+
+    info!("Executing query_iter: {}", query_cql);
+
+    // Create a Query object and set options like page size and timeout
+    let mut query = Query::new(query_cql);
+    query.set_page_size(page_size);
+    query.set_request_timeout(Some(Duration::from_secs(60))); // Apply timeout to each internal page request
+
+    // Use session.query_iter for efficient paging and streaming of results
+    let mut rows_iter = session.query_iter(query, ()).await?; // Pass the Query object here
+
+    let mut row_count = 0;
+    while let Some(row_res) = rows_iter.next().await { // Corrected: .next() is available from StreamExt
+        match row_res {
+            Ok(row) => {
+                match GameStats::from_row(row) {
+                    Ok(stat) => {
+                        all_game_stats.push(stat);
+                        row_count += 1;
+                    },
+                    Err(e) => {
+                        error!("Failed to parse game stats row (total processed: {}): {}", row_count, e);
+                        // Decide whether to continue or break on parse errors
+                    }
+                }
+            },
+            Err(e) => {
+                error!("Failed to retrieve row from query_iter (total processed: {}): {}", row_count, e);
+                return Err(Box::new(e)); // Propagate query execution errors
+            }
+        }
+    }
+
+    info!("Successfully fetched and parsed a total of {} game stats records from database using query_iter.", all_game_stats.len());
+    Ok(all_game_stats)
+}
 
 pub async fn insert_game_stats(
     session: &Session,
