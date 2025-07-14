@@ -258,7 +258,7 @@ pub async fn init_db() -> Result<(), scylla::transport::errors::NewSessionError>
                 avg_quality double,
                 avg_win1 double,
                 avg_win2 double,
-                PRIMARY KEY ((pid, year), team)
+                PRIMARY KEY ((team, year), pid) // MODIFIED PRIMARY KEY
             );",
             &[],
         )

@@ -20,8 +20,9 @@ use crate::get_game_stats::{get_game_data, insert_game_stats, GameStats, get_all
 use crate::analytics_calculator::{
     calculate_and_insert_season_averages,
     calculate_and_insert_season_percentiles,
-    get_all_player_season_averages_from_db}
-;
+    get_all_player_season_averages_from_db
+};
+use crate::analytics_types::PlayerSeasonAverages; // Import PlayerSeasonAverages
 
 #[get("/api/hello")]
 async fn hello() -> impl Responder {
@@ -177,6 +178,59 @@ async fn get_game_stats_endpoint(
     HttpResponse::Ok().json(game_stats)
 }
 
+// NEW API ENDPOINT: Fetch player season averages for a given team and year
+#[get("/api/player-season-averages")]
+async fn get_player_season_averages_endpoint(
+    db: web::Data<Session>,
+    query: web::Query<std::collections::HashMap<String, String>>,
+) -> impl Responder {
+    let team_code = match query.get("team") {
+        Some(code) => code,
+        None => return HttpResponse::BadRequest().body("Missing 'team' query param"),
+    };
+
+    let year = match query.get("year") {
+        Some(y) => match y.parse::<i32>() {
+            Ok(n) => n,
+            Err(_) => return HttpResponse::BadRequest().body("Invalid 'year' query param"),
+        },
+        None => return HttpResponse::BadRequest().body("Missing 'year' query param"),
+    };
+
+    let query_cql = r#"
+        SELECT pid, year, team, player_name, games_played, avg_min_per, avg_o_rtg, avg_usg, avg_e_fg, avg_ts_per, avg_orb_per, avg_drb_per, avg_ast_per, avg_to_per, avg_dunks_made, avg_dunks_att, avg_rim_made, avg_rim_att, avg_mid_made, avg_mid_att, avg_two_pm, avg_two_pa, avg_tpm, avg_tpa, avg_ftm, avg_fta, avg_bpm_rd, avg_obpm, avg_dbpm, avg_bpm_net, avg_pts, avg_orb, avg_drb, avg_ast, avg_tov, avg_stl, avg_blk, avg_stl_per, avg_blk_per, avg_pf, avg_possessions, avg_bpm, avg_sbpm, avg_inches, avg_opstyle, avg_quality, avg_win1, avg_win2
+        FROM stats.player_season_avg_stats WHERE team = ? AND year = ?
+    "#;
+
+    let prepared = match db.prepare(query_cql).await {
+        Ok(stmt) => stmt,
+        Err(e) => {
+            error!("Failed to prepare query for player season averages: {}", e);
+            return HttpResponse::InternalServerError().body("Failed to prepare query");
+        }
+    };
+
+    let result = db.execute(&prepared, (team_code, year)).await;
+
+    let rows = match result {
+        Ok(res) => res.rows.unwrap_or_default(),
+        Err(e) => {
+            error!("Failed to query player season averages: {}", e);
+            return HttpResponse::InternalServerError().body("Query failed");
+        }
+    };
+
+    let mut player_averages = Vec::new();
+    for (i, row) in rows.into_iter().enumerate() {
+        match PlayerSeasonAverages::from_row(row) {
+            Ok(avg) => player_averages.push(avg),
+            Err(e) => error!("Failed to parse player season average row {}: {}", i, e),
+        }
+    }
+
+    HttpResponse::Ok().json(player_averages)
+}
+
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -236,6 +290,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .service(get_players_endpoint)
             .service(get_team_stats_endpoint)
             .service(get_game_stats_endpoint)
+            .service(get_player_season_averages_endpoint) // NEW: Add the new endpoint
             .service(hello)
     })
         .bind(("0.0.0.0", 8000))?
