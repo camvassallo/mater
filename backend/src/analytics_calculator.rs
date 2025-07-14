@@ -19,8 +19,8 @@ use crate::analytics_types::{PlayerSeasonAverages, PlayerSeasonPercentiles};
 /// - `games_raw`: A slice of `GameStats` records, potentially unfiltered.
 /// - `player_pid`: The Player ID for whom averages are being calculated.
 /// - `player_year`: The season year for the player.
-/// - `player_team`: The team name for the player.
-/// - `player_name`: The player's name.
+/// - `player_team`: The team name for the player (passed as a string slice).
+/// - `player_name`: The player's name (passed as a string slice).
 ///
 /// Returns:
 /// - `Option<PlayerSeasonAverages>`: `Some` with the calculated averages if games with minutes are found,
@@ -29,8 +29,8 @@ pub fn calculate_averages_for_games(
     games_raw: &[&GameStats],
     player_pid: i32,
     player_year: i32,
-    player_team: String,
-    player_name: String,
+    player_team: &str,
+    player_name: &str,
 ) -> Option<PlayerSeasonAverages> {
 
     // Filter games to only include those where the player logged minutes.
@@ -86,8 +86,6 @@ pub fn calculate_averages_for_games(
     let mut sum_bpm_net = 0.0;
     let mut sum_bpm = 0.0;
     let mut sum_sbpm = 0.0;
-    let mut sum_e_fg_per_game = 0.0;
-    let mut sum_ts_per_per_game = 0.0;
     let mut sum_orb_per_per_game = 0.0;
     let mut sum_drb_per_per_game = 0.0;
     let mut sum_ast_per_per_game = 0.0;
@@ -133,8 +131,6 @@ pub fn calculate_averages_for_games(
         sum_bpm_net += game.bpm_net.unwrap_or_default();
         sum_bpm += game.bpm.unwrap_or_default();
         sum_sbpm += game.sbpm.unwrap_or_default();
-        sum_e_fg_per_game += game.e_fg.unwrap_or_default();
-        sum_ts_per_per_game += game.ts_per.unwrap_or_default();
         sum_orb_per_per_game += game.orb_per.unwrap_or_default();
         sum_drb_per_per_game += game.drb_per.unwrap_or_default();
         sum_ast_per_per_game += game.ast_per.unwrap_or_default();
@@ -144,15 +140,18 @@ pub fn calculate_averages_for_games(
     }
 
     // Calculate true percentages for the given slice based on summed raw totals
+    // Effective Field Goal Percentage (eFG%): (FGM + 0.5 * 3PM) / FGA
+    // FGM = total_two_pm + total_tpm
+    // FGA = total_two_pa + total_tpa
     let avg_e_fg = if (total_two_pa + total_tpa) > 0.0 {
-        (total_two_pm + 0.5 * total_tpm) / (total_two_pa + total_tpa)
+        (total_two_pm + total_tpm + 0.5 * total_tpm) / (total_two_pa + total_tpa) // Corrected formula
     } else { 0.0 };
 
-    let avg_ts_per = if (total_tpa + 0.44 * total_fta) > 0.0 {
-        total_pts / (2.0 * (total_tpa + 0.44 * total_fta))
+    // True Shooting Percentage (TS%): PTS / (2 * (FGA + 0.44 * FTA))
+    // FGA = total_two_pa + total_tpa
+    let avg_ts_per = if (total_two_pa + total_tpa + 0.44 * total_fta) > 0.0 {
+        total_pts / (2.0 * ((total_two_pa + total_tpa) + 0.44 * total_fta))
     } else { 0.0 };
-
-    let avg_ft_per = if total_fta > 0.0 { total_ftm / total_fta } else { 0.0 };
 
     // Average per-game rates (these are already percentages/rates per game, so simple average is appropriate)
     let avg_orb_per = sum_orb_per_per_game / avg_games_played;
@@ -166,8 +165,8 @@ pub fn calculate_averages_for_games(
     Some(PlayerSeasonAverages {
         pid: player_pid,
         year: player_year,
-        team: player_team,
-        player_name,
+        team: player_team.to_string(), // Clone to own the String for the struct field
+        player_name: player_name.to_string(), // Clone to own the String for the struct field
         games_played,
         // Simple averages for per-game values (Category 1)
         avg_min_per: sum_min_per / avg_games_played,
@@ -259,12 +258,13 @@ pub async fn calculate_and_insert_season_averages(
             &games_for_player_season, // Pass the raw games for the season
             pid,
             year,
-            team,
-            player_name,
+            &team, // Pass a reference to team
+            &player_name, // Pass a reference to player_name
         ) {
             season_averages.push(averages);
         } else {
-            info!("Player PID: {}, Year: {}, Team: {} had no games with minutes played for season averages. Skipping.", pid, year, team);
+            // Use a clone for `team` and `player_name` in the info! macro as they are moved into the closure
+            info!("Player PID: {}, Year: {}, Team: {} had no games with minutes played for season averages. Skipping.", pid, year, team.clone());
         }
     }
 
@@ -375,10 +375,11 @@ pub fn calculate_last_x_games_averages(
 
     // Select the most recent `num_games`.
     // If there are fewer games than `num_games`, it will take all available games.
+    // Use `copied()` to get an iterator of `&GameStats` from `&&GameStats`.
     let slice_games: Vec<&GameStats> = if player_games.len() > num_games {
-        player_games.into_iter().skip(player_games.len() - num_games).collect()
+        player_games.iter().copied().skip(player_games.len() - num_games).collect()
     } else {
-        player_games
+        player_games.iter().copied().collect() // Collect references if fewer games than num_games
     };
 
     if slice_games.is_empty() {
@@ -394,8 +395,8 @@ pub fn calculate_last_x_games_averages(
         &slice_games,
         player_id,
         player_year,
-        player_team.to_string(),
-        player_name,
+        player_team, // Pass reference directly
+        &player_name, // Pass reference directly
     )
 }
 
@@ -439,7 +440,8 @@ pub fn calculate_player_averages_by_date_range(
                 game.year == Some(player_year) &&
                 game.tt == player_team &&
                 // Filter by date range: ensures numdate exists and falls within the specified range
-                game.numdate.as_ref().map_or(false, |nd| nd >= start_date_num && nd <= end_date_num)
+                // Use as_str() directly on the String to get &str for comparison
+                game.numdate.as_str() >= start_date_num && game.numdate.as_str() <= end_date_num
         })
         .collect();
 
@@ -456,8 +458,8 @@ pub fn calculate_player_averages_by_date_range(
         &filtered_games,
         player_id,
         player_year,
-        player_team.to_string(),
-        player_name,
+        player_team, // Pass reference directly
+        &player_name, // Pass reference directly
     )
 }
 
