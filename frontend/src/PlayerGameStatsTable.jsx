@@ -8,6 +8,7 @@ import {
     TextFilterModule,
     NumberFilterModule,
 } from 'ag-grid-community';
+import { useParams } from 'react-router-dom'; // Import useParams
 
 ModuleRegistry.registerModules([
     ClientSideRowModelModule,
@@ -22,9 +23,13 @@ const numberFormatter = (param) => {
     return val == null ? '-' : Number(val).toFixed(2);
 };
 
-const PlayerGameStatsTable = ({ team, year, pid }) => {
+// PlayerGameStatsTable component now gets parameters directly from URL
+const PlayerGameStatsTable = () => { // Removed props: ({ team, year, pid })
+    const { team, year, pid } = useParams(); // Get team, year, pid from URL parameters
+
     const [rowData, setRowData] = useState([]);
     const [playerName, setPlayerName] = useState('');
+    const [isLoading, setIsLoading] = useState(false); // Added loading state
 
     const columnDefs = useMemo(() => [
         { headerName: 'Date', field: 'datetext', minWidth: 100 },
@@ -99,57 +104,81 @@ const PlayerGameStatsTable = ({ team, year, pid }) => {
     ], []);
 
     useEffect(() => {
+        // Now, team, year, and pid are directly from useParams
         if (!team || !year || !pid) {
+            console.log("PlayerGameStatsTable: Missing team, year, or pid from URL. Not fetching data.");
             setRowData([]);
             setPlayerName('');
             return;
         }
 
+        setIsLoading(true); // Set loading true when starting fetch
+        setRowData([]); // Clear previous data
+        setPlayerName(''); // Clear previous player name
+
         // Fetch game stats
         const url = `/api/game-stats?pid=${encodeURIComponent(pid)}&year=${encodeURIComponent(year)}&team=${encodeURIComponent(team)}`;
+        console.log("PlayerGameStatsTable: Fetching game stats from URL:", url);
+
         fetch(url)
-            .then(res => res.json())
+            .then(res => {
+                console.log("PlayerGameStatsTable: API Response status:", res.status);
+                if (!res.ok) {
+                    throw new Error(`HTTP error! status: ${res.status}`);
+                }
+                return res.json();
+            })
             .then(data => {
+                console.log("PlayerGameStatsTable: Received data:", data);
                 setRowData(data);
                 // Try to get the player name from the first row, if available
                 if (data.length > 0 && data[0].pp) {
                     setPlayerName(data[0].pp);
                 } else {
-                    setPlayerName('Unknown Player');
+                    // Fallback if no data or pp field is missing
+                    setPlayerName(`Player ${pid}`);
                 }
             })
             .catch(error => {
-                console.error("Error fetching game stats:", error);
+                console.error("PlayerGameStatsTable: Error fetching game stats:", error);
                 setRowData([]);
                 setPlayerName('Error Loading Player');
+            })
+            .finally(() => {
+                setIsLoading(false); // Set loading false after fetch completes (success or error)
             });
-    }, [team, year, pid]);
+    }, [team, year, pid]); // Dependencies are now directly from useParams
 
     return (
         <div className="section">
             <div className="container">
                 <h1 className="title is-3 has-text-centered">
-                    {playerName} Game Logs ({team}, {year})
+                    {playerName || 'Loading Player...'} Game Logs ({team || 'N/A'}, {year || 'N/A'})
                 </h1>
-                <div style={{ height: 'calc(100vh - 100px)', width: '100%' }}>
-                    <div style={{ height: 'calc(100vh - 100px)', width: '100%' }}>
-                        <AgGridReact
-                            rowData={rowData}
-                            columnDefs={columnDefs}
-                            defaultColDef={{
-                                sortable: true,
-                                filter: true,
-                                resizable: true,
-                                minWidth: 100,
-                                flex: 1,
-                            }}
-                            pagination={true}
-                            paginationPageSize={20}
-                            className="ag-theme-quartz ag-theme-compact"
-                            theme={themeQuartz.withPart(colorSchemeDarkBlue)}
-                        />
+                {isLoading ? (
+                    <div style={{ textAlign: 'center', padding: '20px', color: '#eee' }}>Loading game logs...</div>
+                ) : rowData.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '20px', color: '#aaa' }}>No game logs found for this player.</div>
+                ) : (
+                    <div style={{ height: 'calc(100vh - 180px)', width: '100%', overflow: 'hidden' }}> {/* Adjusted height for better fit */}
+                        <div className="ag-theme-quartz ag-theme-compact" style={{ height: '100%', width: '100%' }}>
+                            <AgGridReact
+                                rowData={rowData}
+                                columnDefs={columnDefs}
+                                defaultColDef={{
+                                    sortable: true,
+                                    filter: true,
+                                    resizable: true,
+                                    minWidth: 100,
+                                    flex: 1,
+                                }}
+                                pagination={true}
+                                paginationPageSize={20}
+                                theme={themeQuartz.withPart(colorSchemeDarkBlue)}
+                            />
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
         </div>
     );
