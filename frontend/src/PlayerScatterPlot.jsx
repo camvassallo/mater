@@ -65,7 +65,7 @@ const CustomDot = (props) => {
 
 
 // Custom Tooltip component to display player name and stats on hover
-const CustomTooltip = ({ active, payload, availableStats, selectedXAxis, selectedYAxis }) => {
+const CustomTooltip = ({ active, payload, availableStats, selectedXAxis, selectedYAxis, selectedTeam1, selectedTeam2 }) => { // Added selectedTeam1, selectedTeam2
     if (active && payload && payload.length) {
         // When using a single Scatter component with combined data,
         // payload[0].payload will directly contain the data object of the hovered point.
@@ -81,7 +81,7 @@ const CustomTooltip = ({ active, payload, availableStats, selectedXAxis, selecte
                 fontSize: '0.9em',
                 boxShadow: '0 2px 10px rgba(0,0,0,0.5)' // Subtle shadow
             }}>
-                <p style={{ fontWeight: 'bold', marginBottom: '5px', color: player.team === 'Duke' ? '#007bff' : '#ffc107' }}>
+                <p style={{ fontWeight: 'bold', marginBottom: '5px', color: player.team === selectedTeam1 ? '#007bff' : '#ffc107' }}> {/* Dynamic coloring */}
                     {player.player_name || 'Unknown Player'} ({player.team || 'N/A'})
                 </p>
                 {/* Display X-axis stat using the selectedXAxis prop */}
@@ -428,7 +428,7 @@ const PlayerScatterPlot = () => {
                                 {/* Tooltip component */}
                                 <Tooltip
                                     cursor={{ strokeDasharray: '3 3' }}
-                                    content={<CustomTooltip availableStats={availableStats} selectedXAxis={selectedXAxis} selectedYAxis={selectedYAxis} />}
+                                    content={<CustomTooltip availableStats={availableStats} selectedXAxis={selectedXAxis} selectedYAxis={selectedYAxis} selectedTeam1={selectedTeam1} selectedTeam2={selectedTeam2} />}
                                 />
                                 {/* Custom Legend with dynamic payload */}
                                 <Legend
