@@ -3,26 +3,66 @@ import { Routes, Route, useParams, Navigate } from 'react-router-dom';
 import PlayersTable from './PlayersTable';
 import TeamStatsTable from './TeamStatsTable';
 import PlayerGameStatsTable from './PlayerGameStatsTable';
-import PlayerScatterPlot from './PlayerScatterPlot'; // NEW: Import the new component
+import PlayerScatterPlot from './PlayerScatterPlot';
 import { Link } from 'react-router-dom';
 
 const App = () => {
+    const navBarStyle = {
+        padding: '16px',
+        backgroundColor: '#0056b3', // Darker blue
+        color: 'white',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    };
+
+    const navBrandStyle = {
+        fontSize: '1.5em',
+        fontWeight: 'bold',
+        color: 'white',
+        textDecoration: 'none',
+        marginRight: '20px',
+    };
+
+    const navLinkStyle = {
+        color: 'white',
+        textDecoration: 'none',
+        fontSize: '1.1em',
+        padding: '8px 12px',
+        borderRadius: '4px',
+        transition: 'background-color 0.2s ease-in-out',
+    };
+
+    const navLinkHoverStyle = {
+        backgroundColor: '#004085', // Even darker blue on hover
+    };
+
     return (
-        <main style={{padding: '0', margin: '0', width: '100vw', height: '100vh'}} className="bg-gray-900 text-gray-100">
-            <nav className="navbar is-info p-4 bg-blue-700 text-white shadow-lg">
-                <div className="navbar-brand flex items-center justify-between w-full">
-                    <Link to="/teams" className="navbar-item title is-4 text-white hover:text-blue-200 transition-colors duration-200">
+        <main style={{padding: '0', margin: '0', width: '100vw', minHeight: '100vh', backgroundColor: '#222'}}>
+            <nav style={navBarStyle}>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <Link to="/teams" style={navBrandStyle}>
                         🏀 CamPom Web
                     </Link>
-                    <div className="navbar-menu">
-                        <div className="navbar-end flex space-x-4">
-                            <Link to="/teams" className="navbar-item text-white hover:text-blue-200 transition-colors duration-200 text-lg">
-                                Teams
-                            </Link>
-                            <Link to="/player-chart/Duke/2025" className="navbar-item text-white hover:text-blue-200 transition-colors duration-200 text-lg">
-                                Player Chart
-                            </Link>
-                        </div>
+                    <div style={{ display: 'flex', gap: '15px' }}>
+                        <Link
+                            to="/teams"
+                            style={navLinkStyle}
+                            onMouseEnter={e => e.currentTarget.style.backgroundColor = navLinkHoverStyle.backgroundColor}
+                            onMouseLeave={e => e.currentTarget.style.backgroundColor = navBarStyle.backgroundColor}
+                        >
+                            Teams
+                        </Link>
+                        {/* Updated link to go to a default chart view, allowing PlayerScatterPlot to handle initial URL params */}
+                        <Link
+                            to="/player-chart/2025/Duke" // Default to year and one team
+                            style={navLinkStyle}
+                            onMouseEnter={e => e.currentTarget.style.backgroundColor = navLinkHoverStyle.backgroundColor}
+                            onMouseLeave={e => e.currentTarget.style.backgroundColor = navBarStyle.backgroundColor}
+                        >
+                            Player Chart
+                        </Link>
                     </div>
                 </div>
             </nav>
@@ -30,31 +70,28 @@ const App = () => {
                 <Route path="/" element={<Navigate to="/teams" replace/>}/>
                 <Route path="/teams" element={<TeamStatsTable/>}/>
                 <Route path="/team/:team/year/:year" element={<PlayerRoute/>}/>
-                <Route path="/player/:team/:year/:pid" element={<PlayerGameStatsRoute/>}/>
-                {/* NEW ROUTE: For the player scatter plot */}
-                <Route path="/player-chart/:team/:year" element={<PlayerScatterPlot/>}/>
-                <Route path="*" element={<h2 className="has-text-centered mt-6 text-red-500">404 - Page not found</h2>}/>
+                <Route path="/player/:team/:year/:pid" element={<PlayerGameStatsTable/>}/>
+                {/* UPDATED ROUTE: For the player scatter plot with optional second team */}
+                <Route path="/player-chart/:year/:team1/:team2?" element={<PlayerScatterPlot/>}/>
+                <Route path="*" element={<h2 style={{ textAlign: 'center', marginTop: '40px', color: '#dc3545' }}>404 - Page not found</h2>}/>
             </Routes>
         </main>
     );
 };
 
-// Pull team/year from URL and pass to the table
 const PlayerRoute = () => {
     const {team, year} = useParams();
-    const parsedYear = parseInt(year, 10) || 2025; // Default to 2025 if year is invalid
+    const parsedYear = parseInt(year, 10) || 2025;
 
     return <PlayersTable team={team} year={parsedYear}/>;
 };
 
-// NEW: Pull team, year, and pid from URL and pass to the game stats table
 const PlayerGameStatsRoute = () => {
     const {team, year, pid} = useParams();
-    const parsedYear = parseInt(year, 10) || 2025; // Default to 2025 if year is invalid
-    const parsedPid = parseInt(pid, 10) || 0; // Default to 0 if pid is invalid
+    const parsedYear = parseInt(year, 10) || 2025;
+    const parsedPid = parseInt(pid, 10) || 0;
 
     return <PlayerGameStatsTable team={team} year={parsedYear} pid={parsedPid}/>;
 };
-
 
 export default App;
