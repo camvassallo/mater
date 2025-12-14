@@ -114,3 +114,151 @@ body,
   line-height: 1.1;
   min-height: 26px !important;  /* shrink row height */
 }
+
+/* Mobile-specific AG Grid adjustments */
+@media (max-width: 767px) {
+    .ag-theme-quartz {
+        min-width: unset;
+        overflow-x: auto; /* Allow horizontal scroll */
+        -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+    }
+
+    .ag-theme-compact .ag-root {
+        font-size: 7.5px; /* Compact size */
+    }
+
+    .ag-theme-compact .ag-header-cell-label {
+        font-size: 7px;
+        font-weight: 600;
+        line-height: 1.1;
+    }
+
+    .ag-theme-compact .ag-cell {
+        padding: 1px 2px; /* Minimal spacing */
+        line-height: 1.1;
+        overflow: visible !important;
+        text-overflow: clip !important;
+    }
+
+    .ag-theme-compact .ag-row {
+        min-height: 22px !important; /* Compact rows */
+    }
+
+    .ag-theme-compact .ag-header {
+        min-height: 22px;
+    }
+
+    .ag-theme-compact .ag-header-cell {
+        padding: 1px 2px !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+    }
+
+    /* Prevent all text truncation */
+    .ag-theme-compact .ag-cell-wrapper,
+    .ag-theme-compact .ag-cell-value,
+    .ag-theme-compact .ag-header-cell-text {
+        overflow: visible !important;
+        text-overflow: clip !important;
+        white-space: nowrap !important;
+    }
+
+    /* Pinned column shadow for depth */
+    .ag-pinned-left-header,
+    .ag-pinned-left-cols-container {
+        box-shadow: 2px 0 8px rgba(0, 0, 0, 0.4);
+        z-index: 5;
+    }
+
+    .ag-pinned-left-cols-container .ag-cell {
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+
+    .ag-pinned-left-header .ag-header-cell {
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    /* Mobile tabs styling */
+    .mobile-tabs {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background-color: #242424;
+        padding: 0 4px;
+        margin-bottom: 8px !important;
+    }
+
+    .mobile-tabs ul {
+        display: flex;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        margin: 0;
+    }
+
+    .mobile-tabs ul::-webkit-scrollbar {
+        display: none;
+    }
+
+    .mobile-tabs li {
+        flex-shrink: 0;
+        min-width: fit-content;
+    }
+
+    .mobile-tabs a {
+        font-size: 0.75rem;
+        padding: 0.4rem 0.6rem;
+        white-space: nowrap;
+    }
+
+    .mobile-tabs .icon {
+        display: none;
+    }
+
+    /* Container padding */
+    .section {
+        padding: 0.5rem 0;
+    }
+
+    .section .container {
+        padding-left: 4px;
+        padding-right: 4px;
+    }
+
+    /* Title */
+    .title.is-3 {
+        font-size: 1.1rem;
+        margin-bottom: 0.5rem !important;
+    }
+
+    /* Checkbox and label */
+    label {
+        font-size: 0.85rem !important;
+    }
+
+    input[type="checkbox"] {
+        width: 14px !important;
+        height: 14px !important;
+        margin-right: 4px !important;
+    }
+
+    /* Pagination */
+    .ag-paging-panel {
+        font-size: 0.8rem !important;
+        padding: 4px !important;
+    }
+}
+
+/* Tablet adjustments */
+@media (min-width: 768px) and (max-width: 1024px) {
+    .ag-theme-quartz {
+        min-width: 768px;
+    }
+
+    .ag-theme-compact .ag-root {
+        font-size: 11px;
+    }
+}

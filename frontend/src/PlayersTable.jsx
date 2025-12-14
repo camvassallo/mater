@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { themeQuartz, colorSchemeDarkBlue } from 'ag-grid-community';
 import { AgGridReact } from 'ag-grid-react';
-import { Link } from 'react-router-dom'; // NEW: Import Link
+import { Link } from 'react-router-dom';
 import {
     ModuleRegistry,
     ClientSideRowModelModule,
@@ -48,8 +48,32 @@ const getPercentileColor = (percentile, invert = false) => {
 const PlayersTable = ({ team, year }) => {
     const [rowData, setRowData] = useState([]);
     const [useLast30Days, setUseLast30Days] = useState(true);
+    const [activeTab, setActiveTab] = useState('scoring');
+    const [isMobile, setIsMobile] = useState(false);
+    const [gridApi, setGridApi] = useState(null);
 
-    const columnDefs = useMemo(() => [
+    // Responsive breakpoint detection
+    useEffect(() => {
+        const handleResize = () => {
+            setIsMobile(window.innerWidth < 768);
+        };
+
+        handleResize(); // Initial check
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    // Maintain sort by min_per when changing tabs on mobile
+    useEffect(() => {
+        if (gridApi && isMobile) {
+            gridApi.applyColumnState({
+                state: [{ colId: 'min_per', sort: 'desc', sortIndex: 0 }],
+                defaultState: { sort: null }
+            });
+        }
+    }, [activeTab, gridApi, isMobile]);
+
+    const fullColumnDefs = useMemo(() => [
         // Basic Info - Always visible
         {
             headerName: 'Player Info',
@@ -57,7 +81,8 @@ const PlayersTable = ({ team, year }) => {
                 {
                     headerName: 'Name',
                     field: 'player_name',
-                    minWidth: 180,
+                    width: isMobile ? 120 : undefined,
+                    minWidth: isMobile ? 120 : 180,
                     pinned: 'left',
                     cellRenderer: (params) => {
                         if (params.data && params.data.pid) {
@@ -77,6 +102,15 @@ const PlayersTable = ({ team, year }) => {
                 { field: 'ht', headerName: 'Ht', minWidth: 70 },
                 { field: 'num', headerName: '#', minWidth: 60, hide: true },
                 { field: 'player_type', headerName: 'Role', minWidth: 80 },
+                {
+                    field: 'min_per',
+                    headerName: 'Min%',
+                    width: isMobile ? 60 : undefined,
+                    valueFormatter: numberFormatter,
+                    cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_min_per) }),
+                    sort: 'desc',
+                    sortIndex: 0
+                },
             ]
         },
         // Scoring - Key offensive stats
@@ -97,17 +131,10 @@ const PlayersTable = ({ team, year }) => {
                 },
                 {
                     field: 'usg',
-                    headerName: 'Usage%',
+                    headerName: 'Usg%',
+                    width: isMobile ? 60 : undefined,
                     valueFormatter: numberFormatter,
                     cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_usg) })
-                },
-                {
-                    field: 'min_per',
-                    headerName: 'Min%',
-                    valueFormatter: numberFormatter,
-                    cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_min_per) }),
-                    sort: 'desc',
-                    sortIndex: 0
                 },
                 {
                     field: 'porpag',
@@ -133,12 +160,6 @@ const PlayersTable = ({ team, year }) => {
                     headerName: 'TS%',
                     valueFormatter: numberFormatter,
                     cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_ts_per) })
-                },
-                {
-                    field: 'ft_per',
-                    headerName: 'FT%',
-                    valueFormatter: numberFormatter,
-                    cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_ftm) })
                 },
                 {
                     field: 'two_p_per',
@@ -174,12 +195,6 @@ const PlayersTable = ({ team, year }) => {
                 },
                 { field: 'tpa', headerName: '3PA', hide: true },
                 {
-                    field: 'ftr',
-                    headerName: 'FTR',
-                    valueFormatter: numberFormatter,
-                    cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_fta) })
-                },
-                {
                     field: 'three_pr',
                     headerName: '3PR',
                     valueFormatter: numberFormatter,
@@ -190,6 +205,18 @@ const PlayersTable = ({ team, year }) => {
                     headerName: '3P/100',
                     valueFormatter: numberFormatter,
                     cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_tpm) })
+                },
+                {
+                    field: 'ft_per',
+                    headerName: 'FT%',
+                    valueFormatter: numberFormatter,
+                    cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_ftm) })
+                },
+                {
+                    field: 'ftr',
+                    headerName: 'FTR',
+                    valueFormatter: numberFormatter,
+                    cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_fta) })
                 },
                 { field: 'rim_pct', headerName: 'Rim%', valueFormatter: numberFormatter, hide: true },
                 { field: 'mid_pct', headerName: 'Mid%', valueFormatter: numberFormatter, hide: true },
@@ -366,7 +393,76 @@ const PlayersTable = ({ team, year }) => {
                 { field: 'pick', headerName: 'Draft Pick', valueFormatter: numberFormatter, hide: true },
             ]
         },
-    ], []);
+    ], [isMobile]);
+
+    // Dynamic column filtering based on viewport and active tab
+    const getVisibleColumns = useCallback(() => {
+        if (!isMobile) {
+            // Desktop/Tablet: show all columns
+            return fullColumnDefs;
+        }
+
+        // Mobile: filter based on active tab
+        const categoryMap = {
+            info: ['min_per', 'team', 'conf', 'gp', 'yr', 'ht', 'player_type'],
+            scoring: ['min_per', 'pts', 'o_rtg', 'usg', 'porpag', 'adjoe'],
+            shooting: ['min_per', 'e_fg', 'ts_per', 'two_p_per', 'tp_per', 'three_pr', 'three_p_per_100', 'ft_per', 'ftr'],
+            rebounding: ['min_per', 'treb', 'oreb', 'dreb', 'orb_per', 'drb_per'],
+            playmaking: ['min_per', 'ast', 'ast_per', 'to_per', 'ast_tov'],
+            defense: ['min_per', 'stl', 'blk', 'stl_per', 'blk_per', 'drtg', 'dporpag', 'fc_per_40'],
+            advanced: ['min_per', 'bpm', 'obpm', 'dbpm'],
+            all: [] // Show everything when "all" selected
+        };
+
+        if (activeTab === 'all') {
+            return fullColumnDefs; // Show all, scrollable
+        }
+
+        // Only show player_name (pinned) + current category's columns
+        const categoryFields = categoryMap[activeTab] || [];
+
+        // Find the min_per column definition from Player Info group
+        const playerInfoGroup = fullColumnDefs.find(g => g.headerName === 'Player Info');
+        const minPerColumn = playerInfoGroup?.children.find(col => col.field === 'min_per');
+
+        return fullColumnDefs.map(group => {
+            if (group.children) {
+                // For Player Info group: only keep player_name (pinned), unless we're on info tab
+                if (group.headerName === 'Player Info') {
+                    const playerInfoChildren = group.children.filter(col => {
+                        if (col.field === 'player_name') return true;
+                        // On info tab, show other player info fields including min_per
+                        if (activeTab === 'info' && categoryFields.includes(col.field)) return true;
+                        return false;
+                    });
+                    return {
+                        ...group,
+                        children: playerInfoChildren
+                    };
+                }
+
+                // For other groups: show their columns if they're in the current category
+                let filteredChildren = group.children.filter(col =>
+                    categoryFields.includes(col.field)
+                );
+
+                // If min_per is in the current category, add it as the first column
+                if (categoryFields.includes('min_per') && minPerColumn && filteredChildren.length > 0) {
+                    filteredChildren = [minPerColumn, ...filteredChildren];
+                }
+
+                return {
+                    ...group,
+                    children: filteredChildren
+                };
+            }
+            return group;
+        }).filter(group =>
+            !group.children || group.children.length > 0
+        );
+    }, [isMobile, activeTab, fullColumnDefs]);
+
+    const columnDefs = useMemo(() => getVisibleColumns(), [getVisibleColumns]);
 
     useEffect(() => {
         if (!team || !year) return;
@@ -610,6 +706,37 @@ const PlayersTable = ({ team, year }) => {
     console.log('Row data sample:', rowData[0]);
     console.log('Has percentile data?', rowData[0]?.pct_pts !== undefined);
 
+    // Mobile tabs component
+    const MobileTabs = () => {
+        if (!isMobile) return null;
+
+        const tabConfig = [
+            { id: 'info', label: 'Info', icon: '👤' },
+            { id: 'scoring', label: 'Scoring', icon: '🏀' },
+            { id: 'shooting', label: 'Shooting', icon: '🎯' },
+            { id: 'rebounding', label: 'Rebounds', icon: '⬆️' },
+            { id: 'playmaking', label: 'Assists', icon: '🤝' },
+            { id: 'defense', label: 'Defense', icon: '🛡️' },
+            { id: 'advanced', label: 'Advanced', icon: '📊' },
+            { id: 'all', label: 'All', icon: '📋' },
+        ];
+
+        return (
+            <div className="tabs is-toggle is-fullwidth is-small mobile-tabs" style={{ marginBottom: '12px' }}>
+                <ul>
+                    {tabConfig.map(tab => (
+                        <li key={tab.id} className={activeTab === tab.id ? 'is-active' : ''}>
+                            <a onClick={() => setActiveTab(tab.id)}>
+                                <span className="icon is-small">{tab.icon}</span>
+                                <span>{tab.label}</span>
+                            </a>
+                        </li>
+                    ))}
+                </ul>
+            </div>
+        );
+    };
+
     return (
         <div className="section">
             <div className="container">
@@ -625,6 +752,7 @@ const PlayersTable = ({ team, year }) => {
                         Last 30 Days
                     </label>
                 </div>
+                <MobileTabs />
                 <div style={{height: 'calc(100vh - 150px)', width: '100%'}}>
                     <div style={{height: 'calc(100vh - 150px)', width: '100%'}}>
                         <AgGridReact
@@ -632,15 +760,19 @@ const PlayersTable = ({ team, year }) => {
                             columnDefs={columnDefs}
                             defaultColDef={{
                                 sortable: true,
-                                filter: true,
-                                resizable: true,
-                                minWidth: 150,
-                                flex: 1,
+                                filter: !isMobile,
+                                resizable: !isMobile,
+                                width: isMobile ? 75 : undefined,
+                                minWidth: isMobile ? 70 : 150,
+                                flex: isMobile ? 0 : 1,
+                                suppressSizeToFit: isMobile,
                             }}
                             pagination={true}
-                            paginationPageSize={20}
+                            paginationPageSize={isMobile ? 20 : 20}
                             className="ag-theme-quartz ag-theme-compact"
                             theme={themeQuartz.withPart(colorSchemeDarkBlue)}
+                            enableCellTextSelection={!isMobile}
+                            onGridReady={(params) => setGridApi(params.api)}
                         />
                     </div>
                 </div>
