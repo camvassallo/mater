@@ -709,3 +709,47 @@ pub async fn calculate_and_insert_season_percentiles(
 
     Ok(())
 }
+
+/// Fetches all player season percentile statistics from ScyllaDB.
+pub async fn get_all_player_season_percentiles_from_db(
+    session: &Session,
+) -> Result<Vec<PlayerSeasonPercentiles>, Box<dyn std::error::Error>> {
+    info!("Fetching all player season percentiles from database...");
+    let query_cql = r#"
+        SELECT pid, year, team, player_name, pct_min_per, pct_o_rtg, pct_usg, pct_e_fg, pct_ts_per, pct_orb_per, pct_drb_per, pct_ast_per, pct_to_per, pct_dunks_made, pct_dunks_att, pct_rim_made, pct_rim_att, pct_mid_made, pct_mid_att, pct_two_pm, pct_two_pa, pct_tpm, pct_tpa, pct_ftm, pct_fta, pct_bpm_rd, pct_obpm, pct_dbpm, pct_bpm_net, pct_pts, pct_orb, pct_drb, pct_ast, pct_tov, pct_stl, pct_blk, pct_stl_per, pct_blk_per, pct_pf, pct_possessions, pct_bpm, pct_sbpm, pct_inches, pct_opstyle, pct_quality, pct_win1, pct_win2
+        FROM stats.player_season_percentiles
+    "#;
+
+    let mut all_percentiles = Vec::new();
+    let page_size: i32 = 5000;
+
+    let mut query = Query::new(query_cql);
+    query.set_page_size(page_size);
+    query.set_request_timeout(Some(Duration::from_secs(60)));
+
+    let mut rows_iter = session.query_iter(query, ()).await?;
+
+    let mut row_count = 0;
+    while let Some(row_res) = rows_iter.next().await {
+        match row_res {
+            Ok(row) => {
+                match PlayerSeasonPercentiles::from_row(row) {
+                    Ok(pct) => {
+                        all_percentiles.push(pct);
+                        row_count += 1;
+                    },
+                    Err(e) => {
+                        error!("Failed to parse player season percentile row (total processed: {}): {}", row_count, e);
+                    }
+                }
+            },
+            Err(e) => {
+                error!("Failed to retrieve row from query_iter (total processed: {}): {}", row_count, e);
+                return Err(Box::new(e));
+            }
+        }
+    }
+
+    info!("Successfully fetched and parsed a total of {} player season percentile records.", all_percentiles.len());
+    Ok(all_percentiles)
+}
