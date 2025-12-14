@@ -81,8 +81,8 @@ const PlayersTable = ({ team, year }) => {
                 {
                     headerName: 'Name',
                     field: 'player_name',
-                    width: isMobile ? 120 : undefined,
-                    minWidth: isMobile ? 120 : 180,
+                    width: isMobile ? 150 : undefined,
+                    minWidth: isMobile ? 150 : 180,
                     pinned: 'left',
                     cellRenderer: (params) => {
                         if (params.data && params.data.pid) {
