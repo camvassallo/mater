@@ -23,88 +23,125 @@ const PlayersTable = ({ team, year }) => {
     const [rowData, setRowData] = useState([]);
 
     const columnDefs = useMemo(() => [
+        // Basic Info - Always visible
         {
-            headerName: 'Name',
-            field: 'player_name',
-            minWidth: 200,
-            // NEW: Make player_name a clickable link
-            cellRenderer: (params) => {
-                // Check if pid is available before rendering the link
-                if (params.data && params.data.pid) {
-                    // Assuming 'team' and 'year' are available from the PlayersTable props
-                    // and 'pid' is available in the row data.
-                    const team = encodeURIComponent(params.data.team); // Use data.team to be safe
-                    const year = encodeURIComponent(params.data.year); // Use data.year to be safe
-                    const pid = encodeURIComponent(params.data.pid);
-                    const playerName = params.value;
-                    return <Link to={`/player/${team}/${year}/${pid}`}>{playerName}</Link>;
-                }
-                return params.value; // If no PID, render as plain text
-            }
+            headerName: 'Player Info',
+            children: [
+                {
+                    headerName: 'Name',
+                    field: 'player_name',
+                    minWidth: 180,
+                    pinned: 'left',
+                    cellRenderer: (params) => {
+                        if (params.data && params.data.pid) {
+                            const team = encodeURIComponent(params.data.team);
+                            const year = encodeURIComponent(params.data.year);
+                            const pid = encodeURIComponent(params.data.pid);
+                            const playerName = params.value;
+                            return <Link to={`/player/${team}/${year}/${pid}`}>{playerName}</Link>;
+                        }
+                        return params.value;
+                    }
+                },
+                { field: 'team', minWidth: 140 },
+                { field: 'conf', headerName: 'Conf', minWidth: 80 },
+                { field: 'gp', headerName: 'GP', minWidth: 60 },
+                { field: 'yr', headerName: 'Class', minWidth: 80, hide: true },
+                { field: 'ht', headerName: 'Height', minWidth: 80, hide: true },
+                { field: 'num', headerName: '#', minWidth: 60, hide: true },
+                { field: 'player_type', headerName: 'Type', minWidth: 100, hide: true },
+            ]
         },
-        { field: 'team' },
-        { field: 'conf' },
-        { field: 'gp' },
-        { field: 'min_per', valueFormatter: numberFormatter },
-        { field: 'o_rtg', valueFormatter: numberFormatter },
-        { field: 'usg', valueFormatter: numberFormatter },
-        { field: 'e_fg', valueFormatter: numberFormatter },
-        { field: 'ts_per', valueFormatter: numberFormatter },
-        { field: 'orb_per', valueFormatter: numberFormatter },
-        { field: 'drb_per', valueFormatter: numberFormatter },
-        { field: 'ast_per', valueFormatter: numberFormatter },
-        { field: 'to_per', valueFormatter: numberFormatter },
-        { field: 'ftm' },
-        { field: 'fta' },
-        { field: 'ft_per', valueFormatter: numberFormatter },
-        { field: 'two_pm' },
-        { field: 'two_pa' },
-        { field: 'two_p_per', valueFormatter: numberFormatter },
-        { field: 'tpm' },
-        { field: 'tpa' },
-        { field: 'tp_per', valueFormatter: numberFormatter },
-        { field: 'blk_per', valueFormatter: numberFormatter },
-        { field: 'stl_per', valueFormatter: numberFormatter },
-        { field: 'ftr', valueFormatter: numberFormatter },
-        { field: 'yr' },
-        { field: 'ht' },
-        { field: 'num' },
-        { field: 'porpag', valueFormatter: numberFormatter },
-        { field: 'adjoe', valueFormatter: numberFormatter },
-        { field: 'pfr', valueFormatter: numberFormatter },
-        { field: 'year' },
-        { field: 'pid' }, // Make sure PID is fetched and available in rowData
-        { field: 'player_type' },
-        { field: 'rec_rank', valueFormatter: numberFormatter },
-        { field: 'ast_tov', valueFormatter: numberFormatter },
-        { field: 'rim_made', valueFormatter: numberFormatter },
-        { field: 'rim_attempted', valueFormatter: numberFormatter },
-        { field: 'mid_made', valueFormatter: numberFormatter },
-        { field: 'mid_attempted', valueFormatter: numberFormatter },
-        { field: 'rim_pct', valueFormatter: numberFormatter },
-        { field: 'mid_pct', valueFormatter: numberFormatter },
-        { field: 'dunks_made', valueFormatter: numberFormatter },
-        { field: 'dunks_attempted', valueFormatter: numberFormatter },
-        { field: 'dunk_pct', valueFormatter: numberFormatter },
-        { field: 'pick', valueFormatter: numberFormatter },
-        { field: 'drtg', valueFormatter: numberFormatter },
-        { field: 'adrtg', valueFormatter: numberFormatter },
-        { field: 'dporpag', valueFormatter: numberFormatter },
-        { field: 'stops', valueFormatter: numberFormatter },
-        { field: 'bpm', valueFormatter: numberFormatter },
-        { field: 'obpm', valueFormatter: numberFormatter },
-        { field: 'dbpm', valueFormatter: numberFormatter },
-        { field: 'gbpm', valueFormatter: numberFormatter },
-        { field: 'mp', valueFormatter: numberFormatter },
-        { field: 'ogbpm', valueFormatter: numberFormatter },
-        { field: 'dgbpm', valueFormatter: numberFormatter },
-        { field: 'oreb', valueFormatter: numberFormatter },
-        { field: 'dreb', valueFormatter: numberFormatter },
-        { field: 'treb', valueFormatter: numberFormatter },
-        { field: 'ast', valueFormatter: numberFormatter },
-        { field: 'stl', valueFormatter: numberFormatter },
-        { field: 'blk', valueFormatter: numberFormatter },
-        { field: 'pts', valueFormatter: numberFormatter },
+        // Scoring - Key offensive stats
+        {
+            headerName: 'Scoring',
+            children: [
+                { field: 'pts', headerName: 'PTS', valueFormatter: numberFormatter },
+                { field: 'o_rtg', headerName: 'ORtg', valueFormatter: numberFormatter },
+                { field: 'usg', headerName: 'Usage%', valueFormatter: numberFormatter },
+                { field: 'min_per', headerName: 'Min%', valueFormatter: numberFormatter, hide: true },
+                { field: 'porpag', headerName: 'PORPAG', valueFormatter: numberFormatter, hide: true },
+                { field: 'adjoe', headerName: 'AdjOE', valueFormatter: numberFormatter, hide: true },
+            ]
+        },
+        // Shooting - All shooting efficiency
+        {
+            headerName: 'Shooting',
+            children: [
+                { field: 'e_fg', headerName: 'eFG%', valueFormatter: numberFormatter },
+                { field: 'ts_per', headerName: 'TS%', valueFormatter: numberFormatter },
+                { field: 'ft_per', headerName: 'FT%', valueFormatter: numberFormatter },
+                { field: 'two_p_per', headerName: '2P%', valueFormatter: numberFormatter },
+                { field: 'tp_per', headerName: '3P%', valueFormatter: numberFormatter },
+                { field: 'ftm', headerName: 'FTM', hide: true },
+                { field: 'fta', headerName: 'FTA', hide: true },
+                { field: 'two_pm', headerName: '2PM', hide: true },
+                { field: 'two_pa', headerName: '2PA', hide: true },
+                { field: 'tpm', headerName: '3PM', hide: true },
+                { field: 'tpa', headerName: '3PA', hide: true },
+                { field: 'ftr', headerName: 'FTR', valueFormatter: numberFormatter, hide: true },
+                { field: 'rim_pct', headerName: 'Rim%', valueFormatter: numberFormatter, hide: true },
+                { field: 'mid_pct', headerName: 'Mid%', valueFormatter: numberFormatter, hide: true },
+                { field: 'dunk_pct', headerName: 'Dunk%', valueFormatter: numberFormatter, hide: true },
+                { field: 'rim_made', headerName: 'Rim Made', valueFormatter: numberFormatter, hide: true },
+                { field: 'rim_attempted', headerName: 'Rim Att', valueFormatter: numberFormatter, hide: true },
+                { field: 'mid_made', headerName: 'Mid Made', valueFormatter: numberFormatter, hide: true },
+                { field: 'mid_attempted', headerName: 'Mid Att', valueFormatter: numberFormatter, hide: true },
+                { field: 'dunks_made', headerName: 'Dunks', valueFormatter: numberFormatter, hide: true },
+                { field: 'dunks_attempted', headerName: 'Dunk Att', valueFormatter: numberFormatter, hide: true },
+            ]
+        },
+        // Rebounding
+        {
+            headerName: 'Rebounding',
+            children: [
+                { field: 'treb', headerName: 'TRB', valueFormatter: numberFormatter },
+                { field: 'oreb', headerName: 'ORB', valueFormatter: numberFormatter, hide: true },
+                { field: 'dreb', headerName: 'DRB', valueFormatter: numberFormatter, hide: true },
+                { field: 'orb_per', headerName: 'ORB%', valueFormatter: numberFormatter, hide: true },
+                { field: 'drb_per', headerName: 'DRB%', valueFormatter: numberFormatter, hide: true },
+            ]
+        },
+        // Playmaking
+        {
+            headerName: 'Playmaking',
+            children: [
+                { field: 'ast', headerName: 'AST', valueFormatter: numberFormatter },
+                { field: 'ast_per', headerName: 'AST%', valueFormatter: numberFormatter },
+                { field: 'to_per', headerName: 'TO%', valueFormatter: numberFormatter },
+                { field: 'ast_tov', headerName: 'AST/TO', valueFormatter: numberFormatter, hide: true },
+            ]
+        },
+        // Defense
+        {
+            headerName: 'Defense',
+            children: [
+                { field: 'stl', headerName: 'STL', valueFormatter: numberFormatter },
+                { field: 'blk', headerName: 'BLK', valueFormatter: numberFormatter },
+                { field: 'stl_per', headerName: 'STL%', valueFormatter: numberFormatter },
+                { field: 'blk_per', headerName: 'BLK%', valueFormatter: numberFormatter },
+                { field: 'drtg', headerName: 'DRtg', valueFormatter: numberFormatter, hide: true },
+                { field: 'adrtg', headerName: 'AdjDRtg', valueFormatter: numberFormatter, hide: true },
+                { field: 'dporpag', headerName: 'DPORPAG', valueFormatter: numberFormatter, hide: true },
+                { field: 'stops', headerName: 'Stops', valueFormatter: numberFormatter, hide: true },
+            ]
+        },
+        // Advanced Stats
+        {
+            headerName: 'Advanced',
+            children: [
+                { field: 'bpm', headerName: 'BPM', valueFormatter: numberFormatter },
+                { field: 'obpm', headerName: 'OBPM', valueFormatter: numberFormatter, hide: true },
+                { field: 'dbpm', headerName: 'DBPM', valueFormatter: numberFormatter, hide: true },
+                { field: 'gbpm', headerName: 'GBPM', valueFormatter: numberFormatter, hide: true },
+                { field: 'ogbpm', headerName: 'OGBPM', valueFormatter: numberFormatter, hide: true },
+                { field: 'dgbpm', headerName: 'DGBPM', valueFormatter: numberFormatter, hide: true },
+                { field: 'mp', headerName: 'MP', valueFormatter: numberFormatter, hide: true },
+                { field: 'pfr', headerName: 'PFR', valueFormatter: numberFormatter, hide: true },
+                { field: 'rec_rank', headerName: 'Recruit Rank', valueFormatter: numberFormatter, hide: true },
+                { field: 'pick', headerName: 'Draft Pick', valueFormatter: numberFormatter, hide: true },
+            ]
+        },
     ], []);
 
     useEffect(() => {
@@ -132,12 +169,12 @@ const PlayersTable = ({ team, year }) => {
                                 sortable: true,
                                 filter: true,
                                 resizable: true,
-                                minWidth: 100, // was 80+
+                                minWidth: 150,
                                 flex: 1,
                             }}
                             pagination={true}
                             paginationPageSize={20}
-                            className="ag-theme-quartz ag-theme-compact" // ✅ this applies your CSS
+                            className="ag-theme-quartz ag-theme-compact"
                             theme={themeQuartz.withPart(colorSchemeDarkBlue)}
                         />
                     </div>
