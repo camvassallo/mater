@@ -47,7 +47,7 @@ const getPercentileColor = (percentile, invert = false) => {
 
 const PlayersTable = ({ team, year }) => {
     const [rowData, setRowData] = useState([]);
-    const [useLast30Days, setUseLast30Days] = useState(false);
+    const [useLast30Days, setUseLast30Days] = useState(true);
 
     const columnDefs = useMemo(() => [
         // Basic Info - Always visible
@@ -105,9 +105,16 @@ const PlayersTable = ({ team, year }) => {
                     field: 'min_per',
                     headerName: 'Min%',
                     valueFormatter: numberFormatter,
-                    cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_min_per) })
+                    cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_min_per) }),
+                    sort: 'desc',
+                    sortIndex: 0
                 },
-                { field: 'porpag', headerName: 'PRPG!', valueFormatter: numberFormatter },
+                {
+                    field: 'porpag',
+                    headerName: 'PRPG!',
+                    valueFormatter: numberFormatter,
+                    cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_porpag) })
+                },
                 { field: 'adjoe', headerName: 'AdjOE', valueFormatter: numberFormatter, hide: true },
             ]
         },
@@ -127,26 +134,86 @@ const PlayersTable = ({ team, year }) => {
                     valueFormatter: numberFormatter,
                     cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_ts_per) })
                 },
-                { field: 'ft_per', headerName: 'FT%', valueFormatter: numberFormatter },
-                { field: 'two_p_per', headerName: '2P%', valueFormatter: numberFormatter },
-                { field: 'tp_per', headerName: '3P%', valueFormatter: numberFormatter },
-                { field: 'ftm', headerName: 'FT', valueFormatter: numberFormatter },
+                {
+                    field: 'ft_per',
+                    headerName: 'FT%',
+                    valueFormatter: numberFormatter,
+                    cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_ftm) })
+                },
+                {
+                    field: 'two_p_per',
+                    headerName: '2P%',
+                    valueFormatter: numberFormatter,
+                    cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_two_pm) })
+                },
+                {
+                    field: 'tp_per',
+                    headerName: '3P%',
+                    valueFormatter: numberFormatter,
+                    cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_tpm) })
+                },
+                {
+                    field: 'ftm',
+                    headerName: 'FT',
+                    valueFormatter: numberFormatter,
+                    cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_ftm) })
+                },
                 { field: 'fta', headerName: 'FTA', hide: true },
-                { field: 'two_pm', headerName: '2P', valueFormatter: numberFormatter },
+                {
+                    field: 'two_pm',
+                    headerName: '2P',
+                    valueFormatter: numberFormatter,
+                    cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_two_pm) })
+                },
                 { field: 'two_pa', headerName: '2PA', hide: true },
-                { field: 'tpm', headerName: '3P', valueFormatter: numberFormatter },
+                {
+                    field: 'tpm',
+                    headerName: '3P',
+                    valueFormatter: numberFormatter,
+                    cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_tpm) })
+                },
                 { field: 'tpa', headerName: '3PA', hide: true },
-                { field: 'ftr', headerName: 'FTR', valueFormatter: numberFormatter },
-                { field: 'three_pr', headerName: '3PR', valueFormatter: numberFormatter },
-                { field: 'three_p_per_100', headerName: '3P/100', valueFormatter: numberFormatter },
+                {
+                    field: 'ftr',
+                    headerName: 'FTR',
+                    valueFormatter: numberFormatter,
+                    cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_fta) })
+                },
+                {
+                    field: 'three_pr',
+                    headerName: '3PR',
+                    valueFormatter: numberFormatter,
+                    cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_tpa) })
+                },
+                {
+                    field: 'three_p_per_100',
+                    headerName: '3P/100',
+                    valueFormatter: numberFormatter,
+                    cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_tpm) })
+                },
                 { field: 'rim_pct', headerName: 'Rim%', valueFormatter: numberFormatter, hide: true },
                 { field: 'mid_pct', headerName: 'Mid%', valueFormatter: numberFormatter, hide: true },
                 { field: 'dunk_pct', headerName: 'Dunk%', valueFormatter: numberFormatter, hide: true },
-                { field: 'rim_made', headerName: 'Close 2', valueFormatter: numberFormatter },
+                {
+                    field: 'rim_made',
+                    headerName: 'Close 2',
+                    valueFormatter: numberFormatter,
+                    cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_rim_made) })
+                },
                 { field: 'rim_attempted', headerName: 'Rim Att', valueFormatter: numberFormatter, hide: true },
-                { field: 'mid_made', headerName: 'Far 2', valueFormatter: numberFormatter },
+                {
+                    field: 'mid_made',
+                    headerName: 'Far 2',
+                    valueFormatter: numberFormatter,
+                    cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_mid_made) })
+                },
                 { field: 'mid_attempted', headerName: 'Mid Att', valueFormatter: numberFormatter, hide: true },
-                { field: 'dunks_made', headerName: 'Dunks', valueFormatter: numberFormatter },
+                {
+                    field: 'dunks_made',
+                    headerName: 'Dunks',
+                    valueFormatter: numberFormatter,
+                    cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_dunks_made) })
+                },
                 { field: 'dunks_attempted', headerName: 'Dunk Att', valueFormatter: numberFormatter, hide: true },
             ]
         },
@@ -210,7 +277,12 @@ const PlayersTable = ({ team, year }) => {
                     valueFormatter: numberFormatter,
                     cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_to_per, true) }) // Inverted
                 },
-                { field: 'ast_tov', headerName: 'A/TO', valueFormatter: numberFormatter },
+                {
+                    field: 'ast_tov',
+                    headerName: 'A/TO',
+                    valueFormatter: numberFormatter,
+                    cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_ast) })
+                },
             ]
         },
         // Defense
@@ -241,11 +313,26 @@ const PlayersTable = ({ team, year }) => {
                     valueFormatter: numberFormatter,
                     cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_blk_per) })
                 },
-                { field: 'drtg', headerName: 'D-Rtg', valueFormatter: numberFormatter },
+                {
+                    field: 'drtg',
+                    headerName: 'D-Rtg',
+                    valueFormatter: numberFormatter,
+                    cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_dbpm, true) }) // Inverted - lower is better
+                },
                 { field: 'adrtg', headerName: 'AdjDRtg', valueFormatter: numberFormatter, hide: true },
-                { field: 'dporpag', headerName: 'D-PRPG', valueFormatter: numberFormatter },
+                {
+                    field: 'dporpag',
+                    headerName: 'D-PRPG',
+                    valueFormatter: numberFormatter,
+                    cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_dbpm) })
+                },
                 { field: 'stops', headerName: 'Stops', valueFormatter: numberFormatter, hide: true },
-                { field: 'fc_per_40', headerName: 'FC/40', valueFormatter: numberFormatter },
+                {
+                    field: 'fc_per_40',
+                    headerName: 'FC/40',
+                    valueFormatter: numberFormatter,
+                    cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_pf, true) }) // Inverted - fewer fouls is better
+                },
             ]
         },
         // Advanced Stats
@@ -368,6 +455,45 @@ const PlayersTable = ({ team, year }) => {
                         pick: null, // Not available in rolling averages
                         pid: player.pid,
                         year: player.year,
+                        // Add percentiles for color coding (calculated on the fly for rolling averages)
+                        pct_pts: player.pct_pts,
+                        pct_o_rtg: player.pct_o_rtg,
+                        pct_usg: player.pct_usg,
+                        pct_min_per: player.pct_min_per,
+                        pct_e_fg: player.pct_e_fg,
+                        pct_ts_per: player.pct_ts_per,
+                        pct_orb: player.pct_orb,
+                        pct_drb: player.pct_drb,
+                        pct_orb_per: player.pct_orb_per,
+                        pct_drb_per: player.pct_drb_per,
+                        pct_ast: player.pct_ast,
+                        pct_ast_per: player.pct_ast_per,
+                        pct_to_per: player.pct_to_per,
+                        pct_tov: player.pct_tov,
+                        pct_stl: player.pct_stl,
+                        pct_blk: player.pct_blk,
+                        pct_stl_per: player.pct_stl_per,
+                        pct_blk_per: player.pct_blk_per,
+                        pct_bpm: player.pct_bpm,
+                        pct_obpm: player.pct_obpm,
+                        pct_dbpm: player.pct_dbpm,
+                        pct_dunks_made: player.pct_dunks_made,
+                        pct_dunks_att: player.pct_dunks_att,
+                        pct_rim_made: player.pct_rim_made,
+                        pct_rim_att: player.pct_rim_att,
+                        pct_mid_made: player.pct_mid_made,
+                        pct_mid_att: player.pct_mid_att,
+                        pct_two_pm: player.pct_two_pm,
+                        pct_two_pa: player.pct_two_pa,
+                        pct_tpm: player.pct_tpm,
+                        pct_tpa: player.pct_tpa,
+                        pct_ftm: player.pct_ftm,
+                        pct_fta: player.pct_fta,
+                        pct_pf: player.pct_pf,
+                        pct_porpag: player.pct_porpag,
+                        pct_dporpag: player.pct_dporpag,
+                        pct_drtg: player.pct_drtg,
+                        pct_adjoe: player.pct_adjoe,
                     }));
                     setRowData(mappedData);
                 } else {

@@ -364,7 +364,140 @@ async fn get_player_rolling_averages_endpoint(
 
     info!("Calculated rolling averages for {} players", rolling_averages.len());
 
-    HttpResponse::Ok().json(rolling_averages)
+    // Calculate percentiles for all stats
+    info!("Calculating percentiles for rolling averages...");
+
+    // Collect all values for each stat (for percentile calculation)
+    let mut all_min_per: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_min_per).collect();
+    let mut all_o_rtg: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_o_rtg).collect();
+    let mut all_usg: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_usg).collect();
+    let mut all_e_fg: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_e_fg).collect();
+    let mut all_ts_per: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_ts_per).collect();
+    let mut all_orb_per: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_orb_per).collect();
+    let mut all_drb_per: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_drb_per).collect();
+    let mut all_ast_per: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_ast_per).collect();
+    let mut all_to_per: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_to_per).collect();
+    let mut all_pts: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_pts).collect();
+    let mut all_orb: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_orb).collect();
+    let mut all_drb: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_drb).collect();
+    let mut all_ast: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_ast).collect();
+    let mut all_stl: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_stl).collect();
+    let mut all_blk: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_blk).collect();
+    let mut all_stl_per: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_stl_per).collect();
+    let mut all_blk_per: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_blk_per).collect();
+    let mut all_bpm: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_bpm).collect();
+    let mut all_obpm: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_obpm).collect();
+    let mut all_dbpm: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_dbpm).collect();
+    let mut all_dunks_made: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_dunks_made).collect();
+    let mut all_dunks_att: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_dunks_att).collect();
+    let mut all_rim_made: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_rim_made).collect();
+    let mut all_rim_att: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_rim_att).collect();
+    let mut all_mid_made: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_mid_made).collect();
+    let mut all_mid_att: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_mid_att).collect();
+    let mut all_two_pm: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_two_pm).collect();
+    let mut all_two_pa: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_two_pa).collect();
+    let mut all_tpm: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_tpm).collect();
+    let mut all_tpa: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_tpa).collect();
+    let mut all_ftm: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_ftm).collect();
+    let mut all_fta: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_fta).collect();
+    let mut all_tov: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_tov).collect();
+    let mut all_pf: Vec<f64> = rolling_averages.iter().map(|p| p.averages.avg_pf).collect();
+
+    // Collect season-long stats (these are optional)
+    let mut all_porpag: Vec<f64> = rolling_averages.iter().filter_map(|p| p.porpag).collect();
+    let mut all_dporpag: Vec<f64> = rolling_averages.iter().filter_map(|p| p.dporpag).collect();
+    let mut all_drtg: Vec<f64> = rolling_averages.iter().filter_map(|p| p.drtg).collect();
+    let mut all_adjoe: Vec<f64> = rolling_averages.iter().filter_map(|p| p.adjoe).collect();
+
+    // Sort all vectors for percentile calculation
+    all_min_per.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_o_rtg.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_usg.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_e_fg.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_ts_per.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_orb_per.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_drb_per.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_ast_per.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_to_per.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_pts.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_orb.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_drb.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_ast.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_stl.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_blk.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_stl_per.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_blk_per.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_bpm.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_obpm.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_dbpm.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_dunks_made.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_dunks_att.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_rim_made.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_rim_att.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_mid_made.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_mid_att.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_two_pm.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_two_pa.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_tpm.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_tpa.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_ftm.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_fta.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_tov.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_pf.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_porpag.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_dporpag.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_drtg.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    all_adjoe.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+    // Create PlayerRollingAveragesWithPercentiles for each player
+    let rolling_with_percentiles: Vec<analytics_types::PlayerRollingAveragesWithPercentiles> = rolling_averages.into_iter().map(|rolling_avg| {
+        analytics_types::PlayerRollingAveragesWithPercentiles {
+            pct_min_per: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_min_per, &all_min_per)),
+            pct_o_rtg: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_o_rtg, &all_o_rtg)),
+            pct_usg: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_usg, &all_usg)),
+            pct_e_fg: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_e_fg, &all_e_fg)),
+            pct_ts_per: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_ts_per, &all_ts_per)),
+            pct_orb_per: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_orb_per, &all_orb_per)),
+            pct_drb_per: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_drb_per, &all_drb_per)),
+            pct_ast_per: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_ast_per, &all_ast_per)),
+            pct_to_per: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_to_per, &all_to_per)),
+            pct_pts: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_pts, &all_pts)),
+            pct_orb: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_orb, &all_orb)),
+            pct_drb: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_drb, &all_drb)),
+            pct_ast: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_ast, &all_ast)),
+            pct_stl: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_stl, &all_stl)),
+            pct_blk: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_blk, &all_blk)),
+            pct_stl_per: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_stl_per, &all_stl_per)),
+            pct_blk_per: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_blk_per, &all_blk_per)),
+            pct_bpm: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_bpm, &all_bpm)),
+            pct_obpm: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_obpm, &all_obpm)),
+            pct_dbpm: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_dbpm, &all_dbpm)),
+            pct_dunks_made: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_dunks_made, &all_dunks_made)),
+            pct_dunks_att: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_dunks_att, &all_dunks_att)),
+            pct_rim_made: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_rim_made, &all_rim_made)),
+            pct_rim_att: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_rim_att, &all_rim_att)),
+            pct_mid_made: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_mid_made, &all_mid_made)),
+            pct_mid_att: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_mid_att, &all_mid_att)),
+            pct_two_pm: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_two_pm, &all_two_pm)),
+            pct_two_pa: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_two_pa, &all_two_pa)),
+            pct_tpm: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_tpm, &all_tpm)),
+            pct_tpa: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_tpa, &all_tpa)),
+            pct_ftm: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_ftm, &all_ftm)),
+            pct_fta: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_fta, &all_fta)),
+            pct_tov: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_tov, &all_tov)),
+            pct_pf: Some(analytics_calculator::calculate_percentile(rolling_avg.averages.avg_pf, &all_pf)),
+            // Season-long stat percentiles (optional)
+            pct_porpag: rolling_avg.porpag.map(|v| analytics_calculator::calculate_percentile(v, &all_porpag)),
+            pct_dporpag: rolling_avg.dporpag.map(|v| analytics_calculator::calculate_percentile(v, &all_dporpag)),
+            pct_drtg: rolling_avg.drtg.map(|v| analytics_calculator::calculate_percentile(v, &all_drtg)),
+            pct_adjoe: rolling_avg.adjoe.map(|v| analytics_calculator::calculate_percentile(v, &all_adjoe)),
+            rolling_avg,
+        }
+    }).collect();
+
+    info!("Calculated percentiles for {} players", rolling_with_percentiles.len());
+
+    HttpResponse::Ok().json(rolling_with_percentiles)
 }
 
 // NEW API ENDPOINT: Fetch player season averages with percentiles
