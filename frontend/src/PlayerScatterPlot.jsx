@@ -141,7 +141,7 @@ const PlayerScatterPlot = () => {
     const [playerData2, setPlayerData2] = useState([]);
     const [selectedXAxis, setSelectedXAxis] = useState('avg_pts');
     const [selectedYAxis, setSelectedYAxis] = useState('avg_ast');
-    const [selectedYear, setSelectedYear] = useState(urlYear || '2025');
+    const [selectedYear, setSelectedYear] = useState(urlYear || '2026');
     const [selectedTeam1, setSelectedTeam1] = useState(urlTeam1 || 'Duke');
     const [selectedTeam2, setSelectedTeam2] = useState(urlUrlTeam2 || '');
 
@@ -179,7 +179,7 @@ const PlayerScatterPlot = () => {
 
     useEffect(() => {
         setAvailableTeams(['Duke', 'Kentucky', 'Kansas', 'UCLA', 'Gonzaga', 'North Carolina', 'Villanova', 'Michigan', 'Purdue']);
-        setAvailableYears(['2023', '2024', '2025']);
+        setAvailableYears(['2023', '2024', '2025', '2026']);
 
         if (!urlYear || !urlTeam1) {
             navigate(`/player-chart/${selectedYear}/${selectedTeam1}`, { replace: true });

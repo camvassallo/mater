@@ -56,7 +56,7 @@ const App = () => {
                         </Link>
                         {/* Updated link to go to a default chart view, allowing PlayerScatterPlot to handle initial URL params */}
                         <Link
-                            to="/player-chart/2025/Duke" // Default to year and one team
+                            to="/player-chart/2026/Duke" // Default to year and one team
                             style={navLinkStyle}
                             onMouseEnter={e => e.currentTarget.style.backgroundColor = navLinkHoverStyle.backgroundColor}
                             onMouseLeave={e => e.currentTarget.style.backgroundColor = navBarStyle.backgroundColor}
@@ -81,14 +81,14 @@ const App = () => {
 
 const PlayerRoute = () => {
     const {team, year} = useParams();
-    const parsedYear = parseInt(year, 10) || 2025;
+    const parsedYear = parseInt(year, 10) || 2026;
 
     return <PlayersTable team={team} year={parsedYear}/>;
 };
 
 const PlayerGameStatsRoute = () => {
     const {team, year, pid} = useParams();
-    const parsedYear = parseInt(year, 10) || 2025;
+    const parsedYear = parseInt(year, 10) || 2026;
     const parsedPid = parseInt(pid, 10) || 0;
 
     return <PlayerGameStatsTable team={team} year={parsedYear} pid={parsedPid}/>;

@@ -15,10 +15,10 @@ pub struct TeamStats {
     pub adjde_rank: i32,
     pub barthag: f64,
     pub barthag_rank: i32,
-    pub proj_wins: i32,
-    pub proj_losses: i32,
-    pub proj_conf_wins: i32,
-    pub proj_conf_losses: i32,
+    pub proj_wins: f64,
+    pub proj_losses: f64,
+    pub proj_conf_wins: f64,
+    pub proj_conf_losses: f64,
     pub conf_record: String,
     pub sos: f64,
     pub nconf_sos: f64,
@@ -37,7 +37,7 @@ pub struct TeamStats {
     pub qual_adjoe: f64,
     pub qual_adjde: f64,
     pub qual_barthag: f64,
-    pub qual_games: i32,
+    pub qual_games: f64,
     pub fun: f64,
     pub conf_pf: f32,
     pub conf_pa: f32,
@@ -53,7 +53,7 @@ pub struct TeamStats {
 }
 
 pub async fn get_team_stats() -> Result<Vec<TeamStats>, Box<dyn Error>> {
-    let url = "https://barttorvik.com/2025_team_results.json";
+    let url = "https://barttorvik.com/2026_team_results.json";
     let response = reqwest::get(url).await?.json::<Vec<TeamStats>>().await?;
     info!("Fetched {} records", response.len());
 

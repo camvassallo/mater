@@ -243,7 +243,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Set this to `true` to skip fetching and inserting data for faster testing.
     // Ensure your ScyllaDB instance already has data if you set this to `true`.
-    const SKIP_DATA_LOADING: bool = true; // Set to `true` to skip data loading
+    const SKIP_DATA_LOADING: bool = false; // Set to `true` to skip data loading
 
     #[allow(unused_assignments)] // Suppress warning about game_stats being assigned but not directly read after assignment
     let mut game_stats: Vec<GameStats> = Vec::new(); // Declare game_stats mutably outside the if block

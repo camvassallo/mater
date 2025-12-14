@@ -77,5 +77,5 @@ export default TeamStatsTable;
 
 const TeamLinkRenderer = (props) => {
     const team = props.value;
-    return <Link to={`/team/${encodeURIComponent(team)}/year/2025`}>{team}</Link>;
+    return <Link to={`/team/${encodeURIComponent(team)}/year/2026`}>{team}</Link>;
 };

@@ -75,7 +75,7 @@ pub struct PlayerStats {
 }
 
 pub async fn get_player_data() -> Result<Vec<PlayerStats>, Box<dyn Error>> {
-    let url = "https://barttorvik.com/getadvstats.php?year=2025&csv=1";
+    let url = "https://barttorvik.com/getadvstats.php?year=2026&csv=1";
     info!("Fetching data from: {}", url);
     let csv_data = reqwest::get(url).await?.text().await?;
     info!("Data fetched successfully. Parsing CSV...");
