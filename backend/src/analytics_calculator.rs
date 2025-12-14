@@ -465,7 +465,7 @@ pub fn calculate_player_averages_by_date_range(
 
 /// Calculates percentile rank for a given value within a sorted list of values.
 /// Returns a value between 0.0 and 100.0.
-fn calculate_percentile(value: f64, sorted_data: &[f64]) -> f64 {
+pub fn calculate_percentile(value: f64, sorted_data: &[f64]) -> f64 {
     if sorted_data.is_empty() {
         return 0.0;
     }

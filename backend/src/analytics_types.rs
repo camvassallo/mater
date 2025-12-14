@@ -81,6 +81,92 @@ pub struct PlayerRollingAverages {
     pub adjoe: Option<f64>,  // Adjusted Offensive Efficiency
 }
 
+/// Player rolling averages with percentiles calculated on the fly
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlayerRollingAveragesWithPercentiles {
+    #[serde(flatten)]
+    pub rolling_avg: PlayerRollingAverages,
+
+    // Percentile ranks (0-100) for rolling averages - matching PlayerSeasonPercentiles
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_min_per: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_o_rtg: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_usg: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_e_fg: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_ts_per: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_orb_per: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_drb_per: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_ast_per: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_to_per: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_dunks_made: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_dunks_att: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_rim_made: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_rim_att: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_mid_made: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_mid_att: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_two_pm: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_two_pa: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_tpm: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_tpa: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_ftm: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_fta: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_pts: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_orb: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_drb: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_ast: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_tov: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_stl: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_blk: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_stl_per: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_blk_per: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_pf: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_bpm: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_obpm: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_dbpm: Option<f64>,
+    // Season-long stat percentiles
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_porpag: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_dporpag: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_drtg: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pct_adjoe: Option<f64>,
+}
+
 /// Represents a player's percentile ranks for their season average statistics.
 /// Percentile values are from 0.0 to 100.0.
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, SerializeRow)]
