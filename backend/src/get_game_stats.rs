@@ -179,7 +179,7 @@ impl GameStats {
 }
 
 pub async fn get_game_data() -> Result<Vec<GameStats>, Box<dyn Error>> {
-    let url = "https://barttorvik.com/2025_all_advgames.json.gz";
+    let url = "https://barttorvik.com/2026_all_advgames.json.gz";
     info!("Fetching gzipped game data from: {}", url);
 
     let response = reqwest::get(url).await?.bytes().await?;
