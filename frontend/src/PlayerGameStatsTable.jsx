@@ -32,75 +32,113 @@ const PlayerGameStatsTable = () => { // Removed props: ({ team, year, pid })
     const [isLoading, setIsLoading] = useState(false); // Added loading state
 
     const columnDefs = useMemo(() => [
-        { headerName: 'Date', field: 'datetext', minWidth: 100 },
-        { headerName: 'Opponent', field: 'opponent', minWidth: 150 },
-        { headerName: 'Min_per', field: 'min_per', valueFormatter: numberFormatter },
-        { headerName: 'ORtg', field: 'o_rtg', valueFormatter: numberFormatter },
-        { headerName: 'Usage', field: 'usage', valueFormatter: numberFormatter },
-        { headerName: 'eFG', field: 'e_fg', valueFormatter: numberFormatter },
-        { headerName: 'TS%', field: 'ts_per', valueFormatter: numberFormatter },
-        { headerName: 'ORB%', field: 'orb_per', valueFormatter: numberFormatter },
-        { headerName: 'DRB%', field: 'drb_per', valueFormatter: numberFormatter },
-        { headerName: 'AST%', field: 'ast_per', valueFormatter: numberFormatter },
-        { headerName: 'TO%', field: 'to_per', valueFormatter: numberFormatter },
-        { headerName: 'FTM', field: 'ftm' },
-        { headerName: 'FTA', field: 'fta' },
-        { headerName: 'FT%', field: 'ft_per', valueFormatter: numberFormatter },
-        { headerName: '2PM', field: 'two_pm' },
-        { headerName: '2PA', field: 'two_pa' },
-        { headerName: '2P%', field: 'two_p_per', valueFormatter: numberFormatter },
-        { headerName: '3PM', field: 'tpm' },
-        { headerName: '3PA', field: 'tpa' },
-        { headerName: '3P%', field: 'tp_per', valueFormatter: numberFormatter },
-        { headerName: 'Blk%', field: 'blk_per', valueFormatter: numberFormatter },
-        { headerName: 'Stl%', field: 'stl_per', valueFormatter: numberFormatter },
-        { headerName: 'FTR', field: 'ftr', valueFormatter: numberFormatter },
-        { headerName: 'BPM RD', field: 'bpm_rd', valueFormatter: numberFormatter },
-        { headerName: 'OBPM', field: 'obpm', valueFormatter: numberFormatter },
-        { headerName: 'DBPM', field: 'dbpm', valueFormatter: numberFormatter },
-        { headerName: 'Net BPM', field: 'bpm_net', valueFormatter: numberFormatter },
-        { headerName: 'PTS', field: 'pts', valueFormatter: numberFormatter },
-        { headerName: 'ORB', field: 'orb', valueFormatter: numberFormatter },
-        { headerName: 'DRB', field: 'dreb', valueFormatter: numberFormatter },
-        { headerName: 'AST', field: 'ast', valueFormatter: numberFormatter },
-        { headerName: 'TOV', field: 'tov', valueFormatter: numberFormatter },
-        { headerName: 'STL', field: 'stl', valueFormatter: numberFormatter },
-        { headerName: 'BLK', field: 'blk', valueFormatter: numberFormatter },
-        { headerName: 'PF', field: 'pf', valueFormatter: numberFormatter },
-        { headerName: 'Poss', field: 'possessions', valueFormatter: numberFormatter },
-        { headerName: 'BPM', field: 'bpm', valueFormatter: numberFormatter },
-        { headerName: 'SBPM', field: 'sbpm', valueFormatter: numberFormatter },
-        { headerName: 'Loc', field: 'loc' },
-        { headerName: 'MUID', field: 'muid' }, // Maybe useful for debugging or linking to external sites
-        { headerName: 'Win1', field: 'win1' },
-        { headerName: 'Win2', field: 'win2' },
-        { headerName: 'OP Style', field: 'opstyle' },
-        { headerName: 'Quality', field: 'quality' },
-        { headerName: 'Dunks Made', field: 'dunks_made' },
-        { headerName: 'Dunks Att', field: 'dunks_att' },
-        { headerName: 'Rim Made', field: 'rim_made' },
-        { headerName: 'Rim Att', field: 'rim_att' },
-        { headerName: 'Mid Made', field: 'mid_made' },
-        { headerName: 'Mid Att', field: 'mid_att' },
-        { headerName: 'PFR', field: 'pfr', valueFormatter: numberFormatter },
-        { headerName: 'Year', field: 'year' },
-        { headerName: 'PID', field: 'pid' },
-        { headerName: 'Rec Rank', field: 'rec_rank', valueFormatter: numberFormatter },
-        { headerName: 'Ast/TOV', field: 'ast_tov', valueFormatter: numberFormatter },
-        { headerName: 'Rim Pct', field: 'rim_pct', valueFormatter: numberFormatter },
-        { headerName: 'Mid Pct', field: 'mid_pct', valueFormatter: numberFormatter },
-        { headerName: 'Dunk Pct', field: 'dunk_pct', valueFormatter: numberFormatter },
-        { headerName: 'Pick', field: 'pick', valueFormatter: numberFormatter },
-        { headerName: 'DRTG', field: 'drtg', valueFormatter: numberFormatter },
-        { headerName: 'ADRTG', field: 'adrtg', valueFormatter: numberFormatter },
-        { headerName: 'DPORPAG', field: 'dporpag', valueFormatter: numberFormatter },
-        { headerName: 'Stops', field: 'stops', valueFormatter: numberFormatter },
-        { headerName: 'GBPM', field: 'gbpm', valueFormatter: numberFormatter },
-        { headerName: 'MP', field: 'mp', valueFormatter: numberFormatter },
-        { headerName: 'OGBPM', field: 'ogbpm', valueFormatter: numberFormatter },
-        { headerName: 'DGBPM', field: 'dgbpm', valueFormatter: numberFormatter },
-        { headerName: 'numdate', field: 'numdate' }, // raw date number
-        // 'pp' and 'tt' are player name and team code, not needed in every row of individual player games
+        // Game Info - Always visible
+        {
+            headerName: 'Game Info',
+            children: [
+                { headerName: 'Date', field: 'datetext', minWidth: 90, pinned: 'left' },
+                { headerName: 'Opponent', field: 'opponent', minWidth: 140, pinned: 'left' },
+                { headerName: 'Location', field: 'loc', minWidth: 80 },
+                { headerName: 'Win', field: 'win1', minWidth: 65, hide: true },
+                { headerName: 'Quality', field: 'quality', minWidth: 80, hide: true },
+                { headerName: 'OP Style', field: 'opstyle', minWidth: 90, hide: true },
+            ]
+        },
+        // Performance - Key stats
+        {
+            headerName: 'Performance',
+            children: [
+                { headerName: 'PTS', field: 'pts', minWidth: 65, valueFormatter: numberFormatter },
+                { headerName: 'AST', field: 'ast', minWidth: 65, valueFormatter: numberFormatter },
+                { headerName: 'STL', field: 'stl', minWidth: 65, valueFormatter: numberFormatter },
+                { headerName: 'BLK', field: 'blk', minWidth: 65, valueFormatter: numberFormatter },
+                { headerName: 'TOV', field: 'tov', minWidth: 65, valueFormatter: numberFormatter },
+                { headerName: 'Min%', field: 'min_per', minWidth: 75, valueFormatter: numberFormatter },
+            ]
+        },
+        // Shooting
+        {
+            headerName: 'Shooting',
+            children: [
+                { headerName: 'eFG%', field: 'e_fg', minWidth: 75, valueFormatter: numberFormatter },
+                { headerName: 'TS%', field: 'ts_per', minWidth: 75, valueFormatter: numberFormatter },
+                { headerName: 'FT%', field: 'ft_per', minWidth: 75, valueFormatter: numberFormatter },
+                { headerName: '2P%', field: 'two_p_per', minWidth: 75, valueFormatter: numberFormatter },
+                { headerName: '3P%', field: 'tp_per', minWidth: 75, valueFormatter: numberFormatter },
+                { headerName: 'FTM', field: 'ftm', minWidth: 65, hide: true },
+                { headerName: 'FTA', field: 'fta', minWidth: 65, hide: true },
+                { headerName: '2PM', field: 'two_pm', minWidth: 65, hide: true },
+                { headerName: '2PA', field: 'two_pa', minWidth: 65, hide: true },
+                { headerName: '3PM', field: 'tpm', minWidth: 65, hide: true },
+                { headerName: '3PA', field: 'tpa', minWidth: 65, hide: true },
+                { headerName: 'FTR', field: 'ftr', minWidth: 70, valueFormatter: numberFormatter, hide: true },
+                { headerName: 'Rim%', field: 'rim_pct', minWidth: 75, valueFormatter: numberFormatter, hide: true },
+                { headerName: 'Mid%', field: 'mid_pct', minWidth: 75, valueFormatter: numberFormatter, hide: true },
+                { headerName: 'Dunk%', field: 'dunk_pct', minWidth: 80, valueFormatter: numberFormatter, hide: true },
+                { headerName: 'Rim Made', field: 'rim_made', minWidth: 90, hide: true },
+                { headerName: 'Rim Att', field: 'rim_att', minWidth: 85, hide: true },
+                { headerName: 'Mid Made', field: 'mid_made', minWidth: 90, hide: true },
+                { headerName: 'Mid Att', field: 'mid_att', minWidth: 85, hide: true },
+                { headerName: 'Dunks', field: 'dunks_made', minWidth: 80, hide: true },
+                { headerName: 'Dunk Att', field: 'dunks_att', minWidth: 85, hide: true },
+            ]
+        },
+        // Efficiency
+        {
+            headerName: 'Efficiency',
+            children: [
+                { headerName: 'ORtg', field: 'o_rtg', minWidth: 75, valueFormatter: numberFormatter },
+                { headerName: 'Usage%', field: 'usage', minWidth: 85, valueFormatter: numberFormatter },
+                { headerName: 'ORB%', field: 'orb_per', minWidth: 75, valueFormatter: numberFormatter, hide: true },
+                { headerName: 'DRB%', field: 'drb_per', minWidth: 75, valueFormatter: numberFormatter, hide: true },
+                { headerName: 'AST%', field: 'ast_per', minWidth: 75, valueFormatter: numberFormatter, hide: true },
+                { headerName: 'TO%', field: 'to_per', minWidth: 75, valueFormatter: numberFormatter, hide: true },
+                { headerName: 'STL%', field: 'stl_per', minWidth: 75, valueFormatter: numberFormatter, hide: true },
+                { headerName: 'BLK%', field: 'blk_per', minWidth: 75, valueFormatter: numberFormatter, hide: true },
+                { headerName: 'AST/TO', field: 'ast_tov', minWidth: 85, valueFormatter: numberFormatter, hide: true },
+            ]
+        },
+        // Rebounding Detail
+        {
+            headerName: 'Rebounding',
+            children: [
+                { headerName: 'ORB', field: 'orb', minWidth: 65, valueFormatter: numberFormatter },
+                { headerName: 'DRB', field: 'dreb', minWidth: 65, valueFormatter: numberFormatter },
+            ]
+        },
+        // Advanced
+        {
+            headerName: 'Advanced',
+            children: [
+                { headerName: 'BPM', field: 'bpm', minWidth: 70, valueFormatter: numberFormatter },
+                { headerName: 'OBPM', field: 'obpm', minWidth: 75, valueFormatter: numberFormatter, hide: true },
+                { headerName: 'DBPM', field: 'dbpm', minWidth: 75, valueFormatter: numberFormatter, hide: true },
+                { headerName: 'Net BPM', field: 'bpm_net', minWidth: 90, valueFormatter: numberFormatter, hide: true },
+                { headerName: 'GBPM', field: 'gbpm', minWidth: 75, valueFormatter: numberFormatter, hide: true },
+                { headerName: 'OGBPM', field: 'ogbpm', minWidth: 80, valueFormatter: numberFormatter, hide: true },
+                { headerName: 'DGBPM', field: 'dgbpm', minWidth: 80, valueFormatter: numberFormatter, hide: true },
+                { headerName: 'SBPM', field: 'sbpm', minWidth: 75, valueFormatter: numberFormatter, hide: true },
+                { headerName: 'BPM RD', field: 'bpm_rd', minWidth: 80, valueFormatter: numberFormatter, hide: true },
+                { headerName: 'DRtg', field: 'drtg', minWidth: 75, valueFormatter: numberFormatter, hide: true },
+                { headerName: 'AdjDRtg', field: 'adrtg', minWidth: 90, valueFormatter: numberFormatter, hide: true },
+                { headerName: 'DPORPAG', field: 'dporpag', minWidth: 95, valueFormatter: numberFormatter, hide: true },
+                { headerName: 'Stops', field: 'stops', minWidth: 75, valueFormatter: numberFormatter, hide: true },
+                { headerName: 'Poss', field: 'possessions', minWidth: 75, valueFormatter: numberFormatter, hide: true },
+                { headerName: 'MP', field: 'mp', minWidth: 65, valueFormatter: numberFormatter, hide: true },
+                { headerName: 'PFR', field: 'pfr', minWidth: 70, valueFormatter: numberFormatter, hide: true },
+            ]
+        },
+        // Misc
+        {
+            headerName: 'Other',
+            children: [
+                { headerName: 'PF', field: 'pf', minWidth: 60, valueFormatter: numberFormatter, hide: true },
+                { headerName: 'Win2', field: 'win2', minWidth: 70, hide: true },
+                { headerName: 'MUID', field: 'muid', minWidth: 100, hide: true },
+                { headerName: 'PID', field: 'pid', minWidth: 70, hide: true },
+                { headerName: 'Year', field: 'year', minWidth: 70, hide: true },
+            ]
+        },
     ], []);
 
     useEffect(() => {
@@ -169,7 +207,7 @@ const PlayerGameStatsTable = () => { // Removed props: ({ team, year, pid })
                                     sortable: true,
                                     filter: true,
                                     resizable: true,
-                                    minWidth: 100,
+                                    minWidth: 150,
                                     flex: 1,
                                 }}
                                 pagination={true}
