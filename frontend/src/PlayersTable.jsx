@@ -47,6 +47,7 @@ const getPercentileColor = (percentile, invert = false) => {
 
 const PlayersTable = ({ team, year }) => {
     const [rowData, setRowData] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [useLast30Days, setUseLast30Days] = useState(true);
     const [activeTab, setActiveTab] = useState('scoring');
     const [isMobile, setIsMobile] = useState(false);
@@ -467,6 +468,8 @@ const PlayersTable = ({ team, year }) => {
     useEffect(() => {
         if (!team || !year) return;
 
+        setLoading(true);
+
         let url;
         let usePercentiles = false;
 
@@ -699,8 +702,12 @@ const PlayersTable = ({ team, year }) => {
                     }));
                     setRowData(mappedData);
                 }
+                setLoading(false);
             })
-            .catch(console.error);
+            .catch(err => {
+                console.error(err);
+                setLoading(false);
+            });
     }, [team, year, useLast30Days]);
 
     console.log('Row data sample:', rowData[0]);
@@ -740,7 +747,7 @@ const PlayersTable = ({ team, year }) => {
     return (
         <div className="section">
             <div className="container">
-                <h1 className="title is-3 has-text-centered">{team} Players ({year})</h1>
+                <h1 className="title is-3 has-text-centered" style={{ color: '#fff' }}>{team} Players ({year})</h1>
                 <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <label style={{ display: 'flex', alignItems: 'center', color: '#eee', fontSize: '1.1em', cursor: 'pointer' }}>
                         <input
@@ -753,29 +760,64 @@ const PlayersTable = ({ team, year }) => {
                     </label>
                 </div>
                 <MobileTabs />
-                <div style={{height: 'calc(100vh - 150px)', width: '100%'}}>
-                    <div style={{height: 'calc(100vh - 150px)', width: '100%'}}>
-                        <AgGridReact
-                            rowData={rowData}
-                            columnDefs={columnDefs}
-                            defaultColDef={{
-                                sortable: true,
-                                filter: !isMobile,
-                                resizable: !isMobile,
-                                width: isMobile ? 75 : undefined,
-                                minWidth: isMobile ? 70 : 150,
-                                flex: isMobile ? 0 : 1,
-                                suppressSizeToFit: isMobile,
-                            }}
-                            pagination={true}
-                            paginationPageSize={isMobile ? 20 : 20}
-                            className="ag-theme-quartz ag-theme-compact"
-                            theme={themeQuartz.withPart(colorSchemeDarkBlue)}
-                            enableCellTextSelection={!isMobile}
-                            onGridReady={(params) => setGridApi(params.api)}
-                        />
+                {loading && (
+                    <div style={{ textAlign: 'center', padding: '40px' }}>
+                        <progress className="progress is-large loading-progress" max="100" style={{ maxWidth: '400px', margin: '0 auto' }} value={undefined}>Loading...</progress>
+                        <p style={{ marginTop: '20px', color: '#eee', fontSize: '1.1em' }}>Loading player data...</p>
+                        <style>{`
+                            @keyframes loading-animation {
+                                0% { background-position: -200% 0; }
+                                100% { background-position: 200% 0; }
+                            }
+                            .loading-progress:indeterminate {
+                                background: linear-gradient(90deg, #3a3a3a 0%, #3a3a3a 40%, #646cff 50%, #3a3a3a 60%, #3a3a3a 100%);
+                                background-size: 200% 100%;
+                                animation: loading-animation 1.5s ease-in-out infinite;
+                            }
+                            .loading-progress::-webkit-progress-bar {
+                                background-color: #3a3a3a;
+                                border-radius: 4px;
+                            }
+                            .loading-progress::-webkit-progress-value {
+                                background: linear-gradient(90deg, #3a3a3a 0%, #3a3a3a 40%, #646cff 50%, #3a3a3a 60%, #3a3a3a 100%);
+                                background-size: 200% 100%;
+                                animation: loading-animation 1.5s ease-in-out infinite;
+                                border-radius: 4px;
+                            }
+                            .loading-progress::-moz-progress-bar {
+                                background: linear-gradient(90deg, #3a3a3a 0%, #3a3a3a 40%, #646cff 50%, #3a3a3a 60%, #3a3a3a 100%);
+                                background-size: 200% 100%;
+                                animation: loading-animation 1.5s ease-in-out infinite;
+                                border-radius: 4px;
+                            }
+                        `}</style>
                     </div>
-                </div>
+                )}
+                {!loading && (
+                    <div style={{height: 'calc(100vh - 150px)', width: '100%'}}>
+                        <div style={{height: 'calc(100vh - 150px)', width: '100%'}}>
+                            <AgGridReact
+                                rowData={rowData}
+                                columnDefs={columnDefs}
+                                defaultColDef={{
+                                    sortable: true,
+                                    filter: !isMobile,
+                                    resizable: !isMobile,
+                                    width: isMobile ? 75 : undefined,
+                                    minWidth: isMobile ? 70 : 150,
+                                    flex: isMobile ? 0 : 1,
+                                    suppressSizeToFit: isMobile,
+                                }}
+                                pagination={true}
+                                paginationPageSize={isMobile ? 20 : 20}
+                                className="ag-theme-quartz ag-theme-compact"
+                                theme={themeQuartz.withPart(colorSchemeDarkBlue)}
+                                enableCellTextSelection={!isMobile}
+                                onGridReady={(params) => setGridApi(params.api)}
+                            />
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
