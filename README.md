@@ -231,6 +231,53 @@ The frontend development server proxies API requests to `http://localhost:8080`.
 2. Frontend changes: Vite provides instant HMR
 3. Database changes: Re-run `init_db` to reset schema
 
+### Remote Access via Cloudflare Tunnel
+
+Access your local development server from anywhere (phone, different WiFi, cellular) using Cloudflare's free tunnel service.
+
+#### Setup
+
+1. **Install Cloudflare Tunnel CLI** (one-time):
+```bash
+brew install cloudflared
+```
+
+2. **Configure Vite for external access** (already done in `frontend/vite.config.js`):
+```javascript
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    host: true,
+    allowedHosts: ['.trycloudflare.com'],
+    proxy: {
+      '/api': 'http://localhost:8000'
+    }
+  }
+});
+```
+
+#### Usage
+
+**Terminal 4 - Cloudflare Tunnel**:
+```bash
+cloudflared tunnel --url http://localhost:5173
+```
+
+You'll get a public URL like:
+```
+https://random-words-1234.trycloudflare.com
+```
+
+**Access from anywhere:**
+- ✅ Your phone (WiFi or cellular)
+- ✅ Any device on any network
+- ✅ Share with others for testing
+
+**Important notes:**
+- URL changes each time you restart the tunnel
+- Free tier has no uptime guarantees
+- For production use, see [Deployment](#deployment) section
+
 ## Building for Production
 
 ### Backend Build
