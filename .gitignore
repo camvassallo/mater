@@ -14,3 +14,7 @@
 
 # frontend
 /frontend/node_modules
+
+# dev scripts
+.logs/
+.pids/

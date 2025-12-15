@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: true, // Allow external access
-    allowedHosts: ['.trycloudflare.com'], // Allow Cloudflare tunnel domains
+    allowedHosts: ['campom.org'], // Allow Cloudflare tunnel domain
     proxy: {
       '/api': 'http://localhost:8000'  // or your Rust API port
     }
