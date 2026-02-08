@@ -64,6 +64,9 @@ pub async fn insert_team_stats(
     session: &Session,
     teams: &[TeamStats],
 ) -> Result<(), scylla::transport::errors::QueryError> {
+    // Truncate before re-inserting to avoid duplicates when ranks change
+    session.query("TRUNCATE stats.team_stats;", &[]).await?;
+
     let query = r#"
         INSERT INTO stats.team_stats (
             rank, team, conf, record, adjoe, adjoe_rank, adjde, adjde_rank, barthag, barthag_rank,

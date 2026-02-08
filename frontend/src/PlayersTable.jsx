@@ -21,28 +21,44 @@ ModuleRegistry.registerModules([
     CellStyleModule,
 ]);
 
-// Helper function to get color based on percentile
+// Helper function to get color based on percentile (smooth continuous gradient)
 const getPercentileColor = (percentile, invert = false) => {
     if (percentile == null || isNaN(percentile)) {
-        console.log('No percentile data for this cell');
         return 'transparent';
     }
 
-    // Invert percentile for "bad" stats (turnovers, fouls, etc.)
     const pct = invert ? (100 - percentile) : percentile;
+    const t = Math.max(0, Math.min(100, pct)) / 100; // normalize to 0-1
 
-    // Red to green gradient - MORE VIBRANT
-    if (pct >= 80) {
-        return 'rgba(34, 139, 34, 0.6)'; // Forest green - increased opacity
-    } else if (pct >= 60) {
-        return 'rgba(144, 238, 144, 0.5)'; // Light green - increased opacity
-    } else if (pct >= 40) {
-        return 'rgba(255, 255, 102, 0.4)'; // Yellow - increased opacity
-    } else if (pct >= 20) {
-        return 'rgba(255, 165, 0, 0.5)'; // Orange - increased opacity
-    } else {
-        return 'rgba(220, 53, 69, 0.5)'; // Red - increased opacity
+    // Color stops: red -> orange -> yellow -> light green -> green
+    const stops = [
+        { t: 0,    r: 220, g: 53,  b: 69  }, // Red
+        { t: 0.25, r: 255, g: 165, b: 0   }, // Orange
+        { t: 0.5,  r: 255, g: 255, b: 102 }, // Yellow
+        { t: 0.75, r: 144, g: 238, b: 144 }, // Light green
+        { t: 1,    r: 34,  g: 139, b: 34  }, // Forest green
+    ];
+
+    // Find the two stops to interpolate between
+    let lower = stops[0], upper = stops[stops.length - 1];
+    for (let i = 0; i < stops.length - 1; i++) {
+        if (t >= stops[i].t && t <= stops[i + 1].t) {
+            lower = stops[i];
+            upper = stops[i + 1];
+            break;
+        }
     }
+
+    const range = upper.t - lower.t;
+    const frac = range === 0 ? 0 : (t - lower.t) / range;
+    const r = Math.round(lower.r + (upper.r - lower.r) * frac);
+    const g = Math.round(lower.g + (upper.g - lower.g) * frac);
+    const b = Math.round(lower.b + (upper.b - lower.b) * frac);
+
+    // Opacity scales slightly with distance from middle (more vivid at extremes)
+    const opacity = 0.35 + 0.25 * Math.abs(t - 0.5) * 2;
+
+    return `rgba(${r}, ${g}, ${b}, ${opacity.toFixed(2)})`;
 };
 
 const PlayersTable = ({ team, year }) => {
@@ -345,7 +361,7 @@ const PlayersTable = ({ team, year }) => {
                     field: 'drtg',
                     headerName: 'D-Rtg',
                     valueFormatter: numberFormatter,
-                    cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_dbpm, true) }) // Inverted - lower is better
+                    cellStyle: params => ({ backgroundColor: getPercentileColor(params.data?.pct_drtg, true) }) // Inverted - lower is better
                 },
                 { field: 'adrtg', headerName: 'AdjDRtg', valueFormatter: numberFormatter, hide: true },
                 {
